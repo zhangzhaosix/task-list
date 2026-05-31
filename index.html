@@ -955,6 +955,7 @@
     measurementId: "G-RJKK4B5DDL"
   });
   const auth = firebase.auth();
+  auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
   const db = firebase.firestore();
   db.settings({ merge: true });
 
