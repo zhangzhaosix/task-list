@@ -754,6 +754,45 @@
     color: #94a3b8;
     font-size: 14px;
   }
+
+  /* ===== Quick Login ===== */
+  .quick-login-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+  }
+  .quick-login-btn:hover { opacity: 0.9; }
+  .link-btn {
+    display: block;
+    margin: 14px auto 0;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 4px 8px;
+    font-family: inherit;
+  }
+  .link-btn:hover { color: #64748b; }
+  .saved-email {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-bottom: 12px;
+    padding: 8px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    word-break: break-all;
+  }
   .auth-avatar {
     width: 48px;
     height: 48px;
@@ -857,6 +896,11 @@
       <input type="password" id="loginPassword" name="password" placeholder="密码" autocomplete="current-password" required>
       <button id="loginBtn" type="submit">登 录</button>
     </form>
+    <div id="quickLoginArea" style="display:none">
+      <div class="saved-email" id="savedEmailDisplay"></div>
+      <button id="quickLoginBtn" class="quick-login-btn">🔑 一键登录</button>
+      <button id="switchToFormBtn" class="link-btn">使用其他账号</button>
+    </div>
     <div class="login-error" id="loginError"></div>
     <div class="login-loading" id="loginLoading" style="display:none">登录中…</div>
   </div>
@@ -1407,22 +1451,30 @@
   const loginBtn = document.getElementById('loginBtn');
   const loginError = document.getElementById('loginError');
   const loginLoading = document.getElementById('loginLoading');
+  const quickLoginArea = document.getElementById('quickLoginArea');
+  const loginFormArea = document.getElementById('loginForm');
 
-  function showLogin() { overlay.classList.remove('hidden'); }
+  function showLogin() {
+    // 检查本地是否保存了凭据
+    const savedEmail = localStorage.getItem('tasklist_email');
+    const savedPassword = localStorage.getItem('tasklist_password');
+    if (savedEmail && savedPassword) {
+      loginFormArea.style.display = 'none';
+      quickLoginArea.style.display = 'block';
+      document.getElementById('savedEmailDisplay').textContent = '📧 ' + savedEmail;
+    } else {
+      loginFormArea.style.display = 'block';
+      quickLoginArea.style.display = 'none';
+    }
+    overlay.classList.remove('hidden');
+  }
+
   function hideLogin() { overlay.classList.add('hidden'); }
-
-  let loginFromForm = false;
 
   auth.onAuthStateChanged(u => {
     if (u) {
       user = u;
-      // 给浏览器密码管理器留时间检测登录成功
-      if (loginFromForm) {
-        loginFromForm = false;
-        setTimeout(() => { hideLogin(); }, 800);
-      } else {
-        hideLogin();
-      }
+      hideLogin();
       planText = document.getElementById('planText');
       planHint = document.getElementById('planHint');
       planWordCount = document.getElementById('planWordCount');
@@ -1437,7 +1489,8 @@
     }
   });
 
-  document.getElementById('loginForm').addEventListener('submit', function(e) {
+  // 邮箱密码登录（首次使用）
+  loginFormArea.addEventListener('submit', function(e) {
     e.preventDefault();
     const email = loginEmail.value.trim();
     const password = loginPassword.value;
@@ -1445,8 +1498,12 @@
     loginLoading.style.display = 'block';
     loginError.textContent = '';
     loginBtn.disabled = true;
-    loginFromForm = true;
     auth.signInWithEmailAndPassword(email, password)
+      .then(() => {
+        // 登录成功，保存凭据到本地
+        localStorage.setItem('tasklist_email', email);
+        localStorage.setItem('tasklist_password', password);
+      })
       .catch(err => {
         loginError.textContent = err.message.includes('user-not-found') || err.message.includes('wrong-password') || err.message.includes('invalid-credential')
           ? '邮箱或密码错误'
@@ -1456,6 +1513,39 @@
         loginLoading.style.display = 'none';
         loginBtn.disabled = false;
       });
+  });
+
+  // 一键登录（使用保存的凭据）
+  document.getElementById('quickLoginBtn').addEventListener('click', function() {
+    const email = localStorage.getItem('tasklist_email');
+    const password = localStorage.getItem('tasklist_password');
+    if (!email || !password) {
+      localStorage.removeItem('tasklist_email');
+      localStorage.removeItem('tasklist_password');
+      showLogin();
+      return;
+    }
+    loginLoading.style.display = 'block';
+    loginError.textContent = '';
+    auth.signInWithEmailAndPassword(email, password)
+      .catch(err => {
+        localStorage.removeItem('tasklist_email');
+        localStorage.removeItem('tasklist_password');
+        showLogin();
+        loginError.textContent = '登录已失效，请重新输入密码';
+      })
+      .finally(() => {
+        loginLoading.style.display = 'none';
+      });
+  });
+
+  // 切换账号
+  document.getElementById('switchToFormBtn').addEventListener('click', function() {
+    localStorage.removeItem('tasklist_email');
+    localStorage.removeItem('tasklist_password');
+    loginEmail.value = '';
+    loginPassword.value = '';
+    showLogin();
   });
 
 	  // ===== Plan =====
@@ -1670,6 +1760,8 @@
   // ===== Logout =====
   document.getElementById('logoutBtn').addEventListener('click', function() {
     if (confirm('确定要退出登录吗？退出后需要重新登录才能查看数据。')) {
+      localStorage.removeItem('tasklist_email');
+      localStorage.removeItem('tasklist_password');
       auth.signOut();
     }
   });
