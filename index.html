@@ -638,6 +638,28 @@
     color: #ef4444;
     background: #fef2f2;
   }
+  .footer-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .data-btn {
+    padding: 8px 14px;
+    background: none;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    color: #94a3b8;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    letter-spacing: 0.3px;
+  }
+  .data-btn:hover {
+    border-color: #818cf8;
+    color: #6366f1;
+    background: #f5f3ff;
+  }
 
   /* ===== Long-term Planning ===== */
   .plan-section {
@@ -775,7 +797,12 @@
   <!-- Footer -->
   <div class="footer-bar">
     <span class="total-info" id="totalInfo"></span>
-    <button class="clear-btn" id="clearBtn">清空已完成</button>
+    <div class="footer-actions">
+      <button class="clear-btn" id="clearBtn">清空已完成</button>
+      <button class="data-btn" id="exportBtn">导出数据</button>
+      <button class="data-btn" id="importBtn">导入数据</button>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+    </div>
   </div>
 
   <!-- Long-term Planning -->
@@ -1363,6 +1390,53 @@
 
   loadMindsets();
   renderMindsets();
+
+  // Export / Import
+  function exportData() {
+    const data = {
+      tasks: localStorage.getItem(STORAGE_KEY),
+      plan: localStorage.getItem(PLAN_KEY),
+      mindsets: localStorage.getItem(MINDSET_KEY)
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `每日任务清单_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importData(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data.tasks) localStorage.setItem(STORAGE_KEY, data.tasks);
+        if (data.plan) localStorage.setItem(PLAN_KEY, data.plan);
+        if (data.mindsets) localStorage.setItem(MINDSET_KEY, data.mindsets);
+        loadTasks();
+        loadPlan();
+        loadMindsets();
+        render();
+        alert('数据导入成功！页面已更新。');
+      } catch {
+        alert('导入失败：文件格式不正确');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  document.getElementById('exportBtn').addEventListener('click', exportData);
+  document.getElementById('importBtn').addEventListener('click', function() {
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', function(e) {
+    if (e.target.files.length > 0) {
+      importData(e.target.files[0]);
+      e.target.value = '';
+    }
+  });
 
   loadTasks();
   render();
