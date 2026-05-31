@@ -663,6 +663,11 @@
     color: #6366f1;
     background: #f5f3ff;
   }
+  .data-btn.logout-btn:hover {
+    border-color: #fca5a5;
+    color: #ef4444;
+    background: #fef2f2;
+  }
 
   /* ===== Login Overlay ===== */
   .login-overlay {
@@ -922,6 +927,7 @@
       <button class="clear-btn" id="clearBtn">清空已完成</button>
       <button class="data-btn" id="exportBtn">导出数据</button>
       <button class="data-btn" id="importBtn">导入数据</button>
+      <button class="data-btn logout-btn" id="logoutBtn">退出登录</button>
       <input type="file" id="importFile" accept=".json" style="display:none">
     </div>
   </div>
@@ -1031,7 +1037,7 @@
   }
 
   // ===== Local Data Migration =====
-  function migrateLocalData() {
+  async function migrateLocalData() {
     const localTasks = localStorage.getItem('daily_tasks');
     const localPlan = localStorage.getItem('daily_tasks_plan');
     const localMindsets = localStorage.getItem('daily_tasks_mindset');
@@ -1039,11 +1045,20 @@
       try { if (localTasks) tasks = JSON.parse(localTasks); } catch {}
       try { if (localMindsets) mindsets = JSON.parse(localMindsets); } catch {}
       if (planText && localPlan) planText.value = localPlan;
-      saveToFirestore().then(() => {
+      try {
+        // 直接写入 Firestore，绕过 fromSnapshot 拦截
+        await getDocRef().set({
+          tasks: JSON.stringify(tasks),
+          plan: planText ? planText.value : '',
+          mindsets: JSON.stringify(mindsets),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
         localStorage.removeItem('daily_tasks');
         localStorage.removeItem('daily_tasks_plan');
         localStorage.removeItem('daily_tasks_mindset');
-      });
+      } catch (e) {
+        console.error('数据迁移写入失败:', e);
+      }
     }
   }
 
@@ -1072,7 +1087,7 @@
     dailyCount.textContent = daily.length;
     tempCount.textContent = temp.length;
     completedCount.textContent = done;
-    totalInfo.innerHTML = `共 ${total} 项任务 ${user ? '✓ 已同步' : ''}`;
+    totalInfo.innerHTML = `共 ${total} 项任务 <span class="sync-badge">${user ? '✓ ' + user.email : ''}</span>`;
 
     const pct = total ? Math.round((done / total) * 100) : 0;
     progressFill.style.width = pct + '%';
@@ -1617,6 +1632,9 @@
         if (data.tasks) tasks = JSON.parse(data.tasks);
         if (data.mindsets) mindsets = JSON.parse(data.mindsets);
         if (planText && data.plan) planText.value = data.plan;
+        // 立即渲染，不等 Firestore 回推
+        render();
+        if (typeof renderMindsets === 'function') renderMindsets();
         saveToFirestore().then(() => {
           alert('数据导入成功！已同步到云端。');
         });
@@ -1635,6 +1653,13 @@
     if (e.target.files.length > 0) {
       importData(e.target.files[0]);
       e.target.value = '';
+    }
+  });
+
+  // ===== Logout =====
+  document.getElementById('logoutBtn').addEventListener('click', function() {
+    if (confirm('确定要退出登录吗？退出后需要重新登录才能查看数据。')) {
+      auth.signOut();
     }
   });
 </script>
