@@ -852,7 +852,7 @@
     <div class="auth-avatar">📋</div>
     <h1>每日任务清单</h1>
     <p>登录后自动同步所有设备</p>
-    <form id="loginForm" onsubmit="return false;">
+    <form id="loginForm" action="#" method="post">
       <input type="email" id="loginEmail" name="email" placeholder="邮箱" autocomplete="username" required>
       <input type="password" id="loginPassword" name="password" placeholder="密码" autocomplete="current-password" required>
       <button id="loginBtn" type="submit">登 录</button>
@@ -1411,10 +1411,18 @@
   function showLogin() { overlay.classList.remove('hidden'); }
   function hideLogin() { overlay.classList.add('hidden'); }
 
+  let loginFromForm = false;
+
   auth.onAuthStateChanged(u => {
     if (u) {
       user = u;
-      hideLogin();
+      // 给浏览器密码管理器留时间检测登录成功
+      if (loginFromForm) {
+        loginFromForm = false;
+        setTimeout(() => { hideLogin(); }, 800);
+      } else {
+        hideLogin();
+      }
       planText = document.getElementById('planText');
       planHint = document.getElementById('planHint');
       planWordCount = document.getElementById('planWordCount');
@@ -1437,6 +1445,7 @@
     loginLoading.style.display = 'block';
     loginError.textContent = '';
     loginBtn.disabled = true;
+    loginFromForm = true;
     auth.signInWithEmailAndPassword(email, password)
       .catch(err => {
         loginError.textContent = err.message.includes('user-not-found') || err.message.includes('wrong-password') || err.message.includes('invalid-credential')
