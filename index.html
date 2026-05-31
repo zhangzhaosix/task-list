@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>每日任务清单</title>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style>
   *, *::before, *::after {
     margin: 0;
@@ -661,6 +664,111 @@
     background: #f5f3ff;
   }
 
+  /* ===== Login Overlay ===== */
+  .login-overlay {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.5s;
+  }
+  .login-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .login-card {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: 40px 36px;
+    width: 360px;
+    max-width: 90vw;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.06);
+    text-align: center;
+  }
+  .login-card h1 {
+    font-size: 24px;
+    margin-bottom: 4px;
+    color: #1e293b;
+  }
+  .login-card p {
+    color: #94a3b8;
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+  .login-card input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    font-size: 15px;
+    margin-bottom: 12px;
+    outline: none;
+    transition: border-color 0.25s;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+  .login-card input:focus {
+    border-color: #818cf8;
+  }
+  .login-card button {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+  }
+  .login-card button:hover {
+    opacity: 0.9;
+  }
+  .login-card button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .login-error {
+    color: #ef4444;
+    font-size: 13px;
+    margin-top: 10px;
+    min-height: 20px;
+  }
+  .login-loading {
+    margin-top: 12px;
+    color: #94a3b8;
+    font-size: 14px;
+  }
+  .auth-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 auto 8px;
+  }
+  .sync-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #94a3b8;
+    margin-left: 8px;
+    font-weight: 400;
+  }
+
   /* ===== Long-term Planning ===== */
   .plan-section {
     margin-top: 24px;
@@ -731,6 +839,19 @@
 </style>
 </head>
 <body>
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="auth-avatar">📋</div>
+    <h1>每日任务清单</h1>
+    <p>登录后自动同步所有设备</p>
+    <input type="email" id="loginEmail" placeholder="邮箱" autocomplete="email">
+    <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password">
+    <button id="loginBtn">登 录</button>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-loading" id="loginLoading" style="display:none">登录中…</div>
+  </div>
+</div>
+
 <div class="container">
   <header>
     <h1><span class="icon">📋</span> 今日任务</h1>
@@ -817,21 +938,29 @@
 </div>
 
 <script>
-  const STORAGE_KEY = 'daily_tasks';
+  // ===== Firebase Init =====
+  firebase.initializeApp({
+    apiKey: "AIzaSyAYWi3MnkAX2qPZ7ODTletzIQQo267Lbxc",
+    authDomain: "task-list-73021.firebaseapp.com",
+    projectId: "task-list-73021",
+    storageBucket: "task-list-73021.firebasestorage.app",
+    messagingSenderId: "463815411355",
+    appId: "1:463815411355:web:810ff0410934041093a83e",
+    measurementId: "G-RJKK4B5DDL"
+  });
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  db.settings({ merge: true });
 
+  // ===== State =====
+  let user = null;
+  let unsubFirestore = null;
+  let fromSnapshot = false;
   let tasks = [];
+  let mindsets = [];
+  let planText = null, planHint = null, planWordCount = null, planTimer = null;
 
-  function loadTasks() {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      tasks = data ? JSON.parse(data) : [];
-    } catch { tasks = []; }
-  }
-
-  function saveTasks() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-  }
-
+  // ===== UI Helpers =====
   function formatDate() {
     const d = new Date();
     const year = d.getFullYear();
@@ -847,7 +976,81 @@
     return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
 
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function isUrl(str) {
+    return /^https?:\/\/[^\s]+$/.test(str.trim());
+  }
+
+  // ===== Firestore =====
+  function getDocRef() {
+    return db.collection('users').doc(user.uid);
+  }
+
+  async function saveToFirestore() {
+    if (!user || fromSnapshot) return;
+    try {
+      await getDocRef().set({
+        tasks: JSON.stringify(tasks),
+        plan: planText ? planText.value : '',
+        mindsets: JSON.stringify(mindsets),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (e) {
+      console.error('Sync error:', e);
+    }
+  }
+
+  function subscribeFirestore() {
+    if (unsubFirestore) unsubFirestore();
+    unsubFirestore = getDocRef().onSnapshot(doc => {
+      fromSnapshot = true;
+      if (doc.exists) {
+        const d = doc.data();
+        try { tasks = d.tasks ? JSON.parse(d.tasks) : []; } catch { tasks = []; }
+        try { mindsets = d.mindsets ? JSON.parse(d.mindsets) : []; } catch { mindsets = []; }
+        if (planText) planText.value = d.plan || '';
+      } else {
+        tasks = [];
+        mindsets = [];
+        if (planText) planText.value = '';
+        migrateLocalData();
+      }
+      render();
+      if (typeof renderMindsets === 'function') renderMindsets();
+      if (planText) { autoResize(planText); updatePlanWordCount(); }
+      fromSnapshot = false;
+    }, err => {
+      console.error('Firestore subscription error:', err);
+      fromSnapshot = false;
+    });
+  }
+
+  // ===== Local Data Migration =====
+  function migrateLocalData() {
+    const localTasks = localStorage.getItem('daily_tasks');
+    const localPlan = localStorage.getItem('daily_tasks_plan');
+    const localMindsets = localStorage.getItem('daily_tasks_mindset');
+    if (localTasks || localPlan || localMindsets) {
+      try { if (localTasks) tasks = JSON.parse(localTasks); } catch {}
+      try { if (localMindsets) mindsets = JSON.parse(localMindsets); } catch {}
+      if (planText && localPlan) planText.value = localPlan;
+      saveToFirestore().then(() => {
+        localStorage.removeItem('daily_tasks');
+        localStorage.removeItem('daily_tasks_plan');
+        localStorage.removeItem('daily_tasks_mindset');
+      });
+    }
+  }
+
+  // ===== Task Operations =====
   let currentType = 'daily';
+
+  function saveTasks() { saveToFirestore(); }
 
   function render() {
     const dailyList = document.getElementById('dailyList');
@@ -869,7 +1072,7 @@
     dailyCount.textContent = daily.length;
     tempCount.textContent = temp.length;
     completedCount.textContent = done;
-    totalInfo.textContent = `共 ${total} 项任务`;
+    totalInfo.innerHTML = `共 ${total} 项任务 ${user ? '✓ 已同步' : ''}`;
 
     const pct = total ? Math.round((done / total) * 100) : 0;
     progressFill.style.width = pct + '%';
@@ -886,10 +1089,6 @@
     completedList.innerHTML = completed.length === 0
       ? '<li class="empty-state">还没有已完成的任务</li>'
       : completed.map(t => renderItem(t)).join('');
-  }
-
-  function isUrl(str) {
-    return /^https?:\/\/[^\s]+$/.test(str.trim());
   }
 
   function renderItem(task) {
@@ -919,12 +1118,6 @@
         <button class="delete-btn" data-delete="${task.id}" title="删除">🗑️</button>
       </span>
     </li>`;
-  }
-
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
   }
 
   async function fetchPageTitle(url) {
@@ -1146,40 +1339,30 @@
     render();
   }
 
-  // ===== Event Delegation (combined) =====
+  // ===== Event Delegation =====
   document.addEventListener('click', function(e) {
-    // Finish mindset edit on outside click
-    if (editingMindsetId && !e.target.closest('.inline-edit-input') && !e.target.closest('[data-mup],[data-mdown],[data-mdel]')) {
+    if (typeof editingMindsetId !== 'undefined' && editingMindsetId && !e.target.closest('.inline-edit-input') && !e.target.closest('[data-mup],[data-mdown],[data-mdel]')) {
       finishMindsetEdit(editingMindsetId, true);
     }
-    // Finish task edit on outside click
     if (editingId && !e.target.closest('.inline-edit-input') && !e.target.closest('[data-edit]')) {
       finishInlineEdit(editingId, true);
     }
 
-    // Mindset: move up
     const mup = e.target.closest('[data-mup]');
     if (mup) { moveMindsetUp(mup.dataset.mup); return; }
-    // Mindset: move down
     const mdown = e.target.closest('[data-mdown]');
     if (mdown) { moveMindsetDown(mdown.dataset.mdown); return; }
-    // Mindset: delete
     const mdel = e.target.closest('[data-mdel]');
     if (mdel) { deleteMindset(mdel.dataset.mdel); return; }
-    // Mindset: click text to edit
     const mtext = e.target.closest('.mindset-item .mindset-text');
     if (mtext) { startMindsetEdit(mtext.closest('.mindset-item').dataset.mid); return; }
 
-    // Task: toggle
     const toggle = e.target.closest('[data-toggle]');
     if (toggle) { toggleTask(toggle.dataset.toggle); return; }
-    // Task: delete
     const del = e.target.closest('[data-delete]');
     if (del) { deleteTask(del.dataset.delete); return; }
-    // Task: edit button
     const edit = e.target.closest('[data-edit]');
     if (edit) { startInlineEdit(edit.dataset.edit); return; }
-    // Task: click text to edit
     const textSpan = e.target.closest('.task-item:not(.completed) .task-text');
     if (textSpan && !e.target.closest('a')) {
       startInlineEdit(textSpan.closest('.task-item').dataset.id);
@@ -1187,7 +1370,7 @@
   });
 
   document.addEventListener('keydown', function(e) {
-    if (editingMindsetId) {
+    if (typeof editingMindsetId !== 'undefined' && editingMindsetId) {
       if (e.key === 'Enter') { e.preventDefault(); finishMindsetEdit(editingMindsetId, true); return; }
       if (e.key === 'Escape') { e.preventDefault(); finishMindsetEdit(editingMindsetId, false); return; }
     }
@@ -1197,87 +1380,109 @@
     }
   });
 
-  document.getElementById('addBtn').addEventListener('click', addTask);
-  document.getElementById('taskInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') addTask();
+  // ===== Auth =====
+  const overlay = document.getElementById('loginOverlay');
+  const loginEmail = document.getElementById('loginEmail');
+  const loginPassword = document.getElementById('loginPassword');
+  const loginBtn = document.getElementById('loginBtn');
+  const loginError = document.getElementById('loginError');
+  const loginLoading = document.getElementById('loginLoading');
+
+  function showLogin() { overlay.classList.remove('hidden'); }
+  function hideLogin() { overlay.classList.add('hidden'); }
+
+  auth.onAuthStateChanged(u => {
+    if (u) {
+      user = u;
+      hideLogin();
+      planText = document.getElementById('planText');
+      planHint = document.getElementById('planHint');
+      planWordCount = document.getElementById('planWordCount');
+      document.getElementById('dateDisplay').textContent = formatDate();
+      subscribeFirestore();
+      setupPlanListeners();
+      setupTaskListeners();
+    } else {
+      user = null;
+      if (unsubFirestore) { unsubFirestore(); unsubFirestore = null; }
+      showLogin();
+    }
   });
-  document.getElementById('clearBtn').addEventListener('click', clearCompleted);
 
-  document.querySelectorAll('.type-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      currentType = this.dataset.type;
-    });
+  loginBtn.addEventListener('click', () => {
+    const email = loginEmail.value.trim();
+    const password = loginPassword.value;
+    if (!email || !password) { loginError.textContent = '请输入邮箱和密码'; return; }
+    loginLoading.style.display = 'block';
+    loginError.textContent = '';
+    loginBtn.disabled = true;
+    auth.signInWithEmailAndPassword(email, password)
+      .catch(err => {
+        loginError.textContent = err.message.includes('user-not-found') || err.message.includes('wrong-password') || err.message.includes('invalid-credential')
+          ? '邮箱或密码错误'
+          : err.message;
+      })
+      .finally(() => {
+        loginLoading.style.display = 'none';
+        loginBtn.disabled = false;
+      });
   });
 
-  document.getElementById('dateDisplay').textContent = formatDate();
+  loginPassword.addEventListener('keydown', e => {
+    if (e.key === 'Enter') loginBtn.click();
+  });
 
-  // Long-term planning
-  const PLAN_KEY = 'daily_tasks_plan';
-  const planText = document.getElementById('planText');
-  const planHint = document.getElementById('planHint');
-  const planWordCount = document.getElementById('planWordCount');
-  let planTimer = null;
-
-  function loadPlan() {
-    try {
-      const saved = localStorage.getItem(PLAN_KEY);
-      if (saved) planText.value = saved;
-    } catch {}
-    autoResize(planText);
-    updatePlanWordCount();
-  }
-
-  function savePlan() {
-    try {
-      localStorage.setItem(PLAN_KEY, planText.value);
-    } catch {}
-    planHint.textContent = '已保存 ✓';
-    planHint.className = 'plan-save-hint saved';
-  }
-
+  // ===== Plan =====
   function updatePlanWordCount() {
+    if (!planText) return;
     const text = planText.value.trim();
     const count = text ? text.length : 0;
     planWordCount.textContent = count + ' 字';
   }
 
   function autoResize(el) {
+    if (!el) return;
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
   }
 
-  planText.addEventListener('input', function() {
-    autoResize(this);
+  function setupPlanListeners() {
+    if (!planText) return;
+    planText.addEventListener('input', function() {
+      autoResize(this);
+      updatePlanWordCount();
+      planHint.textContent = '自动保存';
+      planHint.className = 'plan-save-hint';
+      clearTimeout(planTimer);
+      planTimer = setTimeout(() => saveToFirestore(), 500);
+    });
+    autoResize(planText);
     updatePlanWordCount();
-    planHint.textContent = '自动保存';
-    planHint.className = 'plan-save-hint';
-    clearTimeout(planTimer);
-    planTimer = setTimeout(savePlan, 500);
-  });
-
-  loadPlan();
-  autoResize(planText);
-
-  // Mindset
-  const MINDSET_KEY = 'daily_tasks_mindset';
-  let mindsets = [];
-
-  function loadMindsets() {
-    try {
-      const data = localStorage.getItem(MINDSET_KEY);
-      mindsets = data ? JSON.parse(data) : [];
-    } catch { mindsets = []; }
   }
 
-  function saveMindsets() {
-    localStorage.setItem(MINDSET_KEY, JSON.stringify(mindsets));
+  function setupTaskListeners() {
+    document.getElementById('addBtn').addEventListener('click', addTask);
+    document.getElementById('taskInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') addTask();
+    });
+    document.getElementById('clearBtn').addEventListener('click', clearCompleted);
+
+    document.querySelectorAll('.type-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentType = this.dataset.type;
+      });
+    });
   }
+
+  // ===== Mindset =====
+  function saveMindsets() { saveToFirestore(); }
 
   function renderMindsets() {
     const list = document.getElementById('mindsetList');
     const count = document.getElementById('mindsetCount');
+    if (!list || !count) return;
 
     count.textContent = mindsets.length;
 
@@ -1388,15 +1593,12 @@
     renderMindsets();
   }
 
-  loadMindsets();
-  renderMindsets();
-
-  // Export / Import
+  // ===== Export / Import =====
   function exportData() {
     const data = {
-      tasks: localStorage.getItem(STORAGE_KEY),
-      plan: localStorage.getItem(PLAN_KEY),
-      mindsets: localStorage.getItem(MINDSET_KEY)
+      tasks: JSON.stringify(tasks),
+      plan: planText ? planText.value : '',
+      mindsets: JSON.stringify(mindsets)
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1412,14 +1614,12 @@
     reader.onload = function(e) {
       try {
         const data = JSON.parse(e.target.result);
-        if (data.tasks) localStorage.setItem(STORAGE_KEY, data.tasks);
-        if (data.plan) localStorage.setItem(PLAN_KEY, data.plan);
-        if (data.mindsets) localStorage.setItem(MINDSET_KEY, data.mindsets);
-        loadTasks();
-        loadPlan();
-        loadMindsets();
-        render();
-        alert('数据导入成功！页面已更新。');
+        if (data.tasks) tasks = JSON.parse(data.tasks);
+        if (data.mindsets) mindsets = JSON.parse(data.mindsets);
+        if (planText && data.plan) planText.value = data.plan;
+        saveToFirestore().then(() => {
+          alert('数据导入成功！已同步到云端。');
+        });
       } catch {
         alert('导入失败：文件格式不正确');
       }
@@ -1437,9 +1637,6 @@
       e.target.value = '';
     }
   });
-
-  loadTasks();
-  render();
 </script>
 </body>
 </html>
