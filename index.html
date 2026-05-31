@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日任务清单</title>
+<style>
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+    color: #1e293b;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  .container {
+    max-width: 680px;
+    margin: 0 auto;
+    background: rgba(255,255,255,0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: 32px 28px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.06);
+    border: 1px solid rgba(255,255,255,0.6);
+  }
+
+  /* ===== Header ===== */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    background: linear-gradient(135deg, #1e293b, #475569);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  header h1 .icon {
+    -webkit-text-fill-color: initial;
+  }
+  #dateDisplay {
+    color: #94a3b8;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  /* ===== Progress Bar ===== */
+  .progress-wrap {
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .progress-bar {
+    flex: 1;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-bar .fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #a78bfa, #6366f1);
+    transition: width 0.4s ease;
+  }
+  .progress-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+
+  /* ===== Add Section ===== */
+  .add-section {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .add-section .input-group {
+    flex: 1;
+    display: flex;
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    overflow: hidden;
+    transition: border-color 0.25s, box-shadow 0.25s;
+    min-width: 200px;
+  }
+  .add-section .input-group:focus-within {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 4px rgba(129,140,248,0.15);
+  }
+  .add-section .input-group input {
+    flex: 1;
+    padding: 14px 16px;
+    border: none;
+    border-radius: 14px 0 0 14px;
+    font-size: 15px;
+    outline: none;
+    background: transparent;
+    font-family: inherit;
+  }
+  .add-section .input-group input::placeholder {
+    color: #cbd5e1;
+  }
+  .add-section .input-group #addBtn {
+    padding: 14px 22px;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    color: #fff;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .add-section .input-group #addBtn:hover {
+    opacity: 0.9;
+  }
+  .add-section .input-group #addBtn:active {
+    opacity: 0.8;
+  }
+
+  .add-section .type-selector {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  .add-section .type-btn {
+    padding: 10px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #fff;
+    color: #94a3b8;
+    transition: all 0.2s;
+    white-space: nowrap;
+    font-family: inherit;
+    letter-spacing: 0.3px;
+  }
+  .add-section .type-btn:hover {
+    border-color: #cbd5e1;
+    color: #64748b;
+  }
+  .add-section .type-btn.daily.active {
+    border-color: #f59e0b;
+    color: #d97706;
+    background: #fffbeb;
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.15);
+  }
+  .add-section .type-btn.temp.active {
+    border-color: #10b981;
+    color: #059669;
+    background: #ecfdf5;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.15);
+  }
+
+  /* ===== Mindset Section ===== */
+  .mindset-section {
+    background: linear-gradient(135deg, rgba(255,255,255,0.6), rgba(255,255,255,0.3));
+    border-radius: 16px;
+    padding: 18px 16px 14px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255,255,255,0.8);
+    position: relative;
+  }
+  .mindset-section .mindset-header {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6366f1;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mindset-section .mindset-header .count {
+    background: #eef2ff;
+    padding: 1px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #6366f1;
+    margin-left: auto;
+  }
+  .mindset-input-wrap {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .mindset-input-wrap input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    background: #fff;
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+  .mindset-input-wrap input:focus {
+    border-color: #a78bfa;
+    box-shadow: 0 0 0 3px rgba(167,139,250,0.12);
+  }
+  .mindset-input-wrap button {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #a78bfa, #6366f1);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .mindset-input-wrap button:hover { opacity: 0.9; }
+  .mindset-input-wrap button:active { opacity: 0.8; }
+
+  .mindset-list {
+    list-style: none;
+  }
+  .mindset-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: rgba(255,255,255,0.5);
+    border-radius: 10px;
+    margin-bottom: 4px;
+    transition: background 0.2s;
+    animation: taskIn 0.25s ease;
+  }
+  .mindset-item:hover {
+    background: rgba(255,255,255,0.85);
+  }
+  .mindset-item .mindset-num {
+    font-size: 11px;
+    font-weight: 700;
+    color: #a78bfa;
+    flex-shrink: 0;
+    width: 20px;
+    text-align: center;
+  }
+  .mindset-item .mindset-text {
+    flex: 1;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: #475569;
+    word-break: break-word;
+    cursor: pointer;
+  }
+  .mindset-item .mindset-text:hover {
+    color: #6366f1;
+  }
+  .mindset-item .mindset-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .mindset-item:hover .mindset-actions { opacity: 1; }
+  .mindset-item .mindset-actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 5px;
+    border-radius: 6px;
+    color: #94a3b8;
+    transition: all 0.15s;
+    line-height: 1;
+  }
+  .mindset-item .mindset-actions button:hover {
+    transform: scale(1.15);
+  }
+  .mindset-item .mindset-actions .move-up:hover {
+    background: #eef2ff;
+    color: #6366f1;
+  }
+  .mindset-item .mindset-actions .move-down:hover {
+    background: #eef2ff;
+    color: #6366f1;
+  }
+  .mindset-item .mindset-actions .mindset-del:hover {
+    color: #ef4444;
+    background: #fef2f2;
+  }
+
+  .mindset-empty {
+    text-align: center;
+    padding: 12px;
+    color: #cbd5e1;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* ===== Pending Stack ===== */
+  .pending-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 32px;
+  }
+  .pending-col {
+    background: rgba(255,255,255,0.5);
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid rgba(255,255,255,0.8);
+  }
+  .pending-col .col-header {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #64748b;
+  }
+  .pending-col .col-header .tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  .pending-col .col-header .tag.daily-tag {
+    background: #fef3c7;
+    color: #d97706;
+  }
+  .pending-col .col-header .tag.temp-tag {
+    background: #d1fae5;
+    color: #059669;
+  }
+  .pending-col .col-header .count {
+    background: #e2e8f0;
+    padding: 1px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: auto;
+    color: #64748b;
+  }
+
+  .pending-col .task-list {
+    margin-bottom: 0;
+  }
+
+  /* ===== Completed Section ===== */
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #94a3b8;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title .count {
+    background: #e2e8f0;
+    padding: 1px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  /* ===== Task List ===== */
+  .task-list {
+    list-style: none;
+    margin-bottom: 24px;
+  }
+
+  /* ===== Task Item ===== */
+  .task-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 12px;
+    margin-bottom: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    transition: transform 0.15s, box-shadow 0.2s;
+    animation: taskIn 0.25s ease;
+    position: relative;
+  }
+  @keyframes taskIn {
+    from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .task-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    transform: translateY(-1px);
+  }
+
+  /* ===== Custom Checkbox ===== */
+  .task-item .check-wrap {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  .task-item .check-wrap input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    z-index: 2;
+  }
+  .task-item .check-wrap .check-box {
+    position: absolute;
+    inset: 0;
+    border: 2px solid #cbd5e1;
+    border-radius: 6px;
+    transition: all 0.2s;
+    pointer-events: none;
+  }
+  .task-item .check-wrap input[type="checkbox"]:hover + .check-box {
+    border-color: #818cf8;
+  }
+  .task-item .check-wrap input[type="checkbox"]:checked + .check-box {
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    border-color: #6366f1;
+  }
+  .task-item .check-wrap input[type="checkbox"]:checked + .check-box::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 6px;
+    width: 5px;
+    height: 9px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  /* ===== Task Text ===== */
+  .task-item .task-text {
+    flex: 1;
+    font-size: 14.5px;
+    line-height: 1.4;
+    word-break: break-word;
+    padding: 2px 0;
+  }
+  .task-item:not(.completed) .task-text {
+    cursor: pointer;
+  }
+  .task-item:not(.completed) .task-text:hover {
+    color: #6366f1;
+  }
+  .task-item:not(.completed) .task-text a {
+    color: #6366f1;
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1.5px dashed #c7d2fe;
+    transition: border-color 0.2s;
+  }
+  .task-item:not(.completed) .task-text a:hover {
+    border-bottom-style: solid;
+    border-color: #6366f1;
+  }
+  .task-item.completed .task-text a {
+    color: #cbd5e1;
+    text-decoration: line-through;
+    pointer-events: none;
+  }
+  .task-item.completed .task-text {
+    text-decoration: line-through;
+    color: #cbd5e1;
+  }
+
+  /* ===== Inline Edit ===== */
+  .inline-edit-input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 2px solid #818cf8;
+    border-radius: 8px;
+    font-size: 14.5px;
+    font-family: inherit;
+    outline: none;
+    background: #fff;
+    min-width: 0;
+    box-shadow: 0 0 0 3px rgba(129,140,248,0.12);
+  }
+
+  /* ===== Task Meta ===== */
+  .task-item .task-time {
+    font-size: 12px;
+    color: #cbd5e1;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  /* ===== Actions ===== */
+  .task-item .actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .task-item:hover .actions {
+    opacity: 1;
+  }
+  .task-item .actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 15px;
+    padding: 5px 6px;
+    border-radius: 8px;
+    color: #94a3b8;
+    transition: background 0.15s, color 0.15s, transform 0.15s;
+    line-height: 1;
+  }
+  .task-item .actions button:hover {
+    transform: scale(1.1);
+  }
+  .task-item .actions .edit-btn:hover {
+    background: #eef2ff;
+    color: #6366f1;
+  }
+  .task-item .actions .delete-btn:hover {
+    background: #fef2f2;
+    color: #ef4444;
+  }
+
+  /* ===== Drag Handle ===== */
+  .drag-handle {
+    cursor: grab;
+    font-size: 16px;
+    padding: 2px 2px 2px 0;
+    color: #cbd5e1;
+    flex-shrink: 0;
+    user-select: none;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .task-item:hover .drag-handle { color: #94a3b8; }
+
+  /* ===== Drag States ===== */
+  .task-item.dragging,
+  .mindset-item.dragging {
+    opacity: 0.4;
+    box-shadow: 0 0 0 2px #818cf8;
+  }
+  .task-item.drag-over,
+  .mindset-item.drag-over {
+    box-shadow: 0 0 0 2px #818cf8, 0 4px 12px rgba(99,102,241,0.2);
+    transform: translateY(-2px);
+  }
+
+  /* ===== Type Badge (completed) ===== */
+  .type-badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 4px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    vertical-align: middle;
+  }
+  .badge-daily { background: #fef3c7; color: #d97706; }
+  .badge-temp { background: #d1fae5; color: #059669; }
+
+  /* ===== Empty State ===== */
+  .empty-state {
+    text-align: center;
+    padding: 28px 12px;
+    color: #cbd5e1;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  /* ===== Footer ===== */
+  .footer-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+  }
+  .footer-bar .total-info {
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 500;
+  }
+  .clear-btn {
+    padding: 8px 20px;
+    background: none;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    letter-spacing: 0.3px;
+  }
+  .clear-btn:hover {
+    border-color: #fca5a5;
+    color: #ef4444;
+    background: #fef2f2;
+  }
+
+  /* ===== Long-term Planning ===== */
+  .plan-section {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #e2e8f0;
+  }
+  .plan-section .plan-header {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #94a3b8;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .plan-section textarea {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    font-size: 14px;
+    font-family: inherit;
+    line-height: 1.7;
+    outline: none;
+    resize: none;
+    overflow: hidden;
+    background: rgba(255,255,255,0.6);
+    color: #475569;
+    transition: border-color 0.25s, box-shadow 0.25s;
+    min-height: 56px;
+  }
+  .plan-section textarea:focus {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 4px rgba(129,140,248,0.12);
+  }
+  .plan-section textarea::placeholder {
+    color: #cbd5e1;
+  }
+  .plan-section .plan-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+  .plan-section .plan-save-hint {
+    color: #cbd5e1;
+  }
+  .plan-section .plan-save-hint.saved {
+    color: #10b981;
+  }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 600px) {
+    body { padding: 12px 8px; }
+    .container { padding: 20px 16px; border-radius: 18px; }
+    header h1 { font-size: 24px; }
+    .pending-stack { gap: 14px; }
+    .add-section .input-group { min-width: 100%; }
+    .add-section .type-selector { align-self: stretch; }
+    .add-section .type-btn { flex: 1; text-align: center; }
+    .task-item .actions { opacity: 1; }
+    .mindset-section { padding: 14px 12px; }
+    .mindset-item .mindset-actions { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1><span class="icon">📋</span> 今日任务</h1>
+    <span id="dateDisplay"></span>
+  </header>
+
+  <!-- Progress Bar -->
+  <div class="progress-wrap">
+    <div class="progress-bar">
+      <div class="fill" id="progressFill"></div>
+    </div>
+    <span class="progress-text" id="progressText">0%</span>
+  </div>
+
+  <!-- Add -->
+  <div class="add-section">
+    <div class="input-group">
+      <input type="text" id="taskInput" placeholder="输入新任务..." autofocus>
+      <button id="addBtn">添加</button>
+    </div>
+    <div class="type-selector">
+      <button class="type-btn daily active" data-type="daily">每日必做</button>
+      <button class="type-btn temp" data-type="temporary">临时事件</button>
+    </div>
+  </div>
+
+  <!-- Mindset -->
+  <div class="mindset-section">
+    <div class="mindset-header">
+      🧠 思维模式
+      <span class="count" id="mindsetCount">0</span>
+    </div>
+    <div class="mindset-input-wrap">
+      <input type="text" id="mindsetInput" placeholder="记录一条工作/生活原则..." maxlength="200">
+      <button id="mindsetAddBtn">添加</button>
+    </div>
+    <ul class="mindset-list" id="mindsetList"></ul>
+  </div>
+
+  <!-- Pending -->
+  <div class="pending-stack">
+    <div class="pending-col">
+      <div class="col-header">
+        <span class="tag temp-tag">临时事件</span>
+        <span class="count" id="tempCount">0</span>
+      </div>
+      <ul class="task-list" id="tempList"></ul>
+    </div>
+    <div class="pending-col">
+      <div class="col-header">
+        <span class="tag daily-tag">每日必做</span>
+        <span class="count" id="dailyCount">0</span>
+      </div>
+      <ul class="task-list" id="dailyList"></ul>
+    </div>
+  </div>
+
+  <!-- Completed -->
+  <div class="section-title">
+    已完成 <span class="count" id="completedCount">0</span>
+  </div>
+  <ul class="task-list" id="completedList"></ul>
+
+  <!-- Footer -->
+  <div class="footer-bar">
+    <span class="total-info" id="totalInfo"></span>
+    <button class="clear-btn" id="clearBtn">清空已完成</button>
+  </div>
+
+  <!-- Long-term Planning -->
+  <div class="plan-section">
+    <div class="plan-header">📌 长期规划</div>
+    <textarea id="planText" placeholder="在这里记录长期规划、目标、想法……"></textarea>
+    <div class="plan-footer">
+      <span class="plan-save-hint" id="planHint">自动保存</span>
+      <span style="color:#cbd5e1;" id="planWordCount">0 字</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'daily_tasks';
+
+  let tasks = [];
+
+  function loadTasks() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY);
+      tasks = data ? JSON.parse(data) : [];
+    } catch { tasks = []; }
+  }
+
+  function saveTasks() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  }
+
+  function formatDate() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    const wd = weekdays[d.getDay()];
+    return `${year} 年 ${month} 月 ${day} 日 星期${wd}`;
+  }
+
+  function formatTime(ts) {
+    const d = new Date(ts);
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  let currentType = 'daily';
+
+  function render() {
+    const dailyList = document.getElementById('dailyList');
+    const tempList = document.getElementById('tempList');
+    const completedList = document.getElementById('completedList');
+    const dailyCount = document.getElementById('dailyCount');
+    const tempCount = document.getElementById('tempCount');
+    const completedCount = document.getElementById('completedCount');
+    const totalInfo = document.getElementById('totalInfo');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+
+    const daily = tasks.filter(t => !t.done && t.type === 'daily');
+    const temp = tasks.filter(t => !t.done && t.type === 'temporary');
+    const completed = tasks.filter(t => t.done);
+    const total = tasks.length;
+    const done = completed.length;
+
+    dailyCount.textContent = daily.length;
+    tempCount.textContent = temp.length;
+    completedCount.textContent = done;
+    totalInfo.textContent = `共 ${total} 项任务`;
+
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    progressFill.style.width = pct + '%';
+    progressText.textContent = pct + '%';
+
+    dailyList.innerHTML = daily.length === 0
+      ? '<li class="empty-state">暂无每日必做</li>'
+      : daily.map(t => renderItem(t)).join('');
+
+    tempList.innerHTML = temp.length === 0
+      ? '<li class="empty-state">暂无临时事件</li>'
+      : temp.map(t => renderItem(t)).join('');
+
+    completedList.innerHTML = completed.length === 0
+      ? '<li class="empty-state">还没有已完成的任务</li>'
+      : completed.map(t => renderItem(t)).join('');
+  }
+
+  function isUrl(str) {
+    return /^https?:\/\/[^\s]+$/.test(str.trim());
+  }
+
+  function renderItem(task) {
+    const checked = task.done ? 'checked' : '';
+    const cls = task.done ? 'task-item completed' : 'task-item';
+    const drg = task.done ? '' : ' draggable="true"';
+    const btnHtml = task.done ? '' : '<button class="edit-btn" data-edit="' + task.id + '" title="编辑">✏️</button>';
+    const badge = task.done
+      ? '<span class="type-badge ' + (task.type === 'daily' ? 'badge-daily' : 'badge-temp') + '">' + (task.type === 'daily' ? '每日' : '临时') + '</span> '
+      : '';
+    const text = escapeHtml(task.text);
+    const linkUrl = task.url || (isUrl(task.text) ? task.text : null);
+    const content = linkUrl
+      ? '<a href="' + escapeHtml(linkUrl) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>'
+      : text;
+    const handle = task.done ? '' : '<span class="drag-handle">⠿</span>';
+    return `<li class="${cls}" data-id="${task.id}"${drg}>
+      ${handle}
+      <label class="check-wrap">
+        <input type="checkbox" ${checked} data-toggle="${task.id}">
+        <span class="check-box"></span>
+      </label>
+      <span class="task-text">${badge}${content}</span>
+      <span class="task-time">${formatTime(task.createdAt)}</span>
+      <span class="actions">
+        ${btnHtml}
+        <button class="delete-btn" data-delete="${task.id}" title="删除">🗑️</button>
+      </span>
+    </li>`;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  async function fetchPageTitle(url) {
+    const proxies = [
+      'https://api.allorigins.win/raw?url=',
+      'https://corsproxy.io/?url='
+    ];
+    for (const proxy of proxies) {
+      try {
+        const res = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(5000) });
+        const html = await res.text();
+        const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (m) return m[1].trim();
+      } catch {}
+    }
+    return null;
+  }
+
+  async function addTask() {
+    const input = document.getElementById('taskInput');
+    const raw = input.value.trim();
+    if (!raw) return;
+
+    const task = {
+      id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      text: raw,
+      type: currentType,
+      done: false,
+      createdAt: Date.now()
+    };
+
+    if (isUrl(raw)) {
+      task.url = raw;
+      tasks.push(task);
+      saveTasks();
+      render();
+      input.value = '';
+      input.focus();
+
+      const title = await fetchPageTitle(raw);
+      if (title) {
+        task.text = title;
+        saveTasks();
+        render();
+      }
+      return;
+    }
+
+    tasks.push(task);
+    saveTasks();
+    render();
+    input.value = '';
+    input.focus();
+  }
+
+  function toggleTask(id) {
+    const task = tasks.find(t => t.id === id);
+    if (task) {
+      task.done = !task.done;
+      saveTasks();
+      render();
+    }
+  }
+
+  function deleteTask(id) {
+    tasks = tasks.filter(t => t.id !== id);
+    saveTasks();
+    render();
+  }
+
+  let dragSourceId = null;
+  let mindsetDragSourceId = null;
+
+  document.addEventListener('dragstart', function(e) {
+    const mindsetLi = e.target.closest('.mindset-item');
+    if (mindsetLi) {
+      mindsetDragSourceId = mindsetLi.dataset.mid;
+      mindsetLi.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', mindsetLi.dataset.mid);
+      return;
+    }
+    const taskLi = e.target.closest('.task-item:not(.completed)');
+    if (!taskLi) { e.preventDefault(); return; }
+    dragSourceId = taskLi.dataset.id;
+    taskLi.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', taskLi.dataset.id);
+  });
+
+  document.addEventListener('dragend', function(e) {
+    const li = e.target.closest('.task-item, .mindset-item');
+    if (li) li.classList.remove('dragging');
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    dragSourceId = null;
+    mindsetDragSourceId = null;
+  });
+
+  document.addEventListener('dragover', function(e) {
+    if (mindsetDragSourceId) {
+      const li = e.target.closest('.mindset-item');
+      if (!li || li.dataset.mid === mindsetDragSourceId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.mindset-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+      li.classList.add('drag-over');
+      return;
+    }
+    if (dragSourceId) {
+      const li = e.target.closest('.task-item:not(.completed)');
+      if (!li || li.dataset.id === dragSourceId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.task-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+      li.classList.add('drag-over');
+    }
+  });
+
+  document.addEventListener('dragleave', function(e) {
+    const li = e.target.closest('.task-item, .mindset-item');
+    if (li) li.classList.remove('drag-over');
+  });
+
+  document.addEventListener('drop', function(e) {
+    e.preventDefault();
+    document.querySelectorAll('.drag-over, .dragging').forEach(el => el.classList.remove('drag-over', 'dragging'));
+
+    if (mindsetDragSourceId) {
+      const targetLi = e.target.closest('.mindset-item');
+      if (!targetLi || targetLi.dataset.mid === mindsetDragSourceId) return;
+      const fromIdx = mindsets.findIndex(m => m.id === mindsetDragSourceId);
+      const toIdx = mindsets.findIndex(m => m.id === targetLi.dataset.mid);
+      if (fromIdx === -1 || toIdx === -1) return;
+      const [moved] = mindsets.splice(fromIdx, 1);
+      const newTo = mindsets.findIndex(m => m.id === targetLi.dataset.mid);
+      mindsets.splice(newTo < 0 ? toIdx : newTo, 0, moved);
+      mindsetDragSourceId = null;
+      saveMindsets();
+      renderMindsets();
+      return;
+    }
+
+    if (dragSourceId) {
+      const targetLi = e.target.closest('.task-item:not(.completed)');
+      if (!targetLi || targetLi.dataset.id === dragSourceId) return;
+      const fromIdx = tasks.findIndex(t => t.id === dragSourceId);
+      const toIdx = tasks.findIndex(t => t.id === targetLi.dataset.id);
+      if (fromIdx === -1 || toIdx === -1) return;
+      if (tasks[fromIdx].type !== tasks[toIdx].type) return;
+      const [moved] = tasks.splice(fromIdx, 1);
+      const newTo = tasks.findIndex(t => t.id === targetLi.dataset.id);
+      tasks.splice(newTo < 0 ? toIdx : newTo, 0, moved);
+      dragSourceId = null;
+      saveTasks();
+      render();
+    }
+  });
+
+  let editingId = null;
+
+  function startInlineEdit(id) {
+    const task = tasks.find(t => t.id === id);
+    if (!task || task.done) return;
+    if (editingId === id) return;
+    if (editingId) finishInlineEdit(editingId, true);
+
+    editingId = id;
+    const li = document.querySelector(`li[data-id="${id}"]`);
+    if (!li) { editingId = null; return; }
+
+    const textSpan = li.querySelector('.task-text');
+    if (!textSpan) { editingId = null; return; }
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'inline-edit-input';
+    input.value = task.text;
+
+    textSpan.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  function finishInlineEdit(id, save) {
+    if (editingId !== id) return;
+    editingId = null;
+
+    if (save) {
+      const input = document.querySelector(`li[data-id="${id}"] .inline-edit-input`);
+      if (input) {
+        const newText = input.value.trim();
+        const task = tasks.find(t => t.id === id);
+        if (task && newText) {
+          task.text = newText;
+          saveTasks();
+        }
+      }
+    }
+    render();
+  }
+
+  function clearCompleted() {
+    const completed = tasks.filter(t => t.done);
+    if (completed.length === 0) return;
+
+    const hasDaily = completed.some(t => t.type === 'daily');
+    const msg = hasDaily
+      ? '每日必做将重置为未完成，临时事件将被删除。确定继续吗？'
+      : '确定清空所有已完成的任务吗？';
+
+    if (!confirm(msg)) return;
+
+    tasks = tasks.map(t => {
+      if (t.done && t.type === 'daily') t.done = false;
+      return t;
+    }).filter(t => !(t.done && t.type === 'temporary'));
+
+    saveTasks();
+    render();
+  }
+
+  // ===== Event Delegation (combined) =====
+  document.addEventListener('click', function(e) {
+    // Finish mindset edit on outside click
+    if (editingMindsetId && !e.target.closest('.inline-edit-input') && !e.target.closest('[data-mup],[data-mdown],[data-mdel]')) {
+      finishMindsetEdit(editingMindsetId, true);
+    }
+    // Finish task edit on outside click
+    if (editingId && !e.target.closest('.inline-edit-input') && !e.target.closest('[data-edit]')) {
+      finishInlineEdit(editingId, true);
+    }
+
+    // Mindset: move up
+    const mup = e.target.closest('[data-mup]');
+    if (mup) { moveMindsetUp(mup.dataset.mup); return; }
+    // Mindset: move down
+    const mdown = e.target.closest('[data-mdown]');
+    if (mdown) { moveMindsetDown(mdown.dataset.mdown); return; }
+    // Mindset: delete
+    const mdel = e.target.closest('[data-mdel]');
+    if (mdel) { deleteMindset(mdel.dataset.mdel); return; }
+    // Mindset: click text to edit
+    const mtext = e.target.closest('.mindset-item .mindset-text');
+    if (mtext) { startMindsetEdit(mtext.closest('.mindset-item').dataset.mid); return; }
+
+    // Task: toggle
+    const toggle = e.target.closest('[data-toggle]');
+    if (toggle) { toggleTask(toggle.dataset.toggle); return; }
+    // Task: delete
+    const del = e.target.closest('[data-delete]');
+    if (del) { deleteTask(del.dataset.delete); return; }
+    // Task: edit button
+    const edit = e.target.closest('[data-edit]');
+    if (edit) { startInlineEdit(edit.dataset.edit); return; }
+    // Task: click text to edit
+    const textSpan = e.target.closest('.task-item:not(.completed) .task-text');
+    if (textSpan && !e.target.closest('a')) {
+      startInlineEdit(textSpan.closest('.task-item').dataset.id);
+    }
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (editingMindsetId) {
+      if (e.key === 'Enter') { e.preventDefault(); finishMindsetEdit(editingMindsetId, true); return; }
+      if (e.key === 'Escape') { e.preventDefault(); finishMindsetEdit(editingMindsetId, false); return; }
+    }
+    if (editingId) {
+      if (e.key === 'Enter') { e.preventDefault(); finishInlineEdit(editingId, true); return; }
+      if (e.key === 'Escape') { e.preventDefault(); finishInlineEdit(editingId, false); return; }
+    }
+  });
+
+  document.getElementById('addBtn').addEventListener('click', addTask);
+  document.getElementById('taskInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') addTask();
+  });
+  document.getElementById('clearBtn').addEventListener('click', clearCompleted);
+
+  document.querySelectorAll('.type-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentType = this.dataset.type;
+    });
+  });
+
+  document.getElementById('dateDisplay').textContent = formatDate();
+
+  // Long-term planning
+  const PLAN_KEY = 'daily_tasks_plan';
+  const planText = document.getElementById('planText');
+  const planHint = document.getElementById('planHint');
+  const planWordCount = document.getElementById('planWordCount');
+  let planTimer = null;
+
+  function loadPlan() {
+    try {
+      const saved = localStorage.getItem(PLAN_KEY);
+      if (saved) planText.value = saved;
+    } catch {}
+    autoResize(planText);
+    updatePlanWordCount();
+  }
+
+  function savePlan() {
+    try {
+      localStorage.setItem(PLAN_KEY, planText.value);
+    } catch {}
+    planHint.textContent = '已保存 ✓';
+    planHint.className = 'plan-save-hint saved';
+  }
+
+  function updatePlanWordCount() {
+    const text = planText.value.trim();
+    const count = text ? text.length : 0;
+    planWordCount.textContent = count + ' 字';
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }
+
+  planText.addEventListener('input', function() {
+    autoResize(this);
+    updatePlanWordCount();
+    planHint.textContent = '自动保存';
+    planHint.className = 'plan-save-hint';
+    clearTimeout(planTimer);
+    planTimer = setTimeout(savePlan, 500);
+  });
+
+  loadPlan();
+  autoResize(planText);
+
+  // Mindset
+  const MINDSET_KEY = 'daily_tasks_mindset';
+  let mindsets = [];
+
+  function loadMindsets() {
+    try {
+      const data = localStorage.getItem(MINDSET_KEY);
+      mindsets = data ? JSON.parse(data) : [];
+    } catch { mindsets = []; }
+  }
+
+  function saveMindsets() {
+    localStorage.setItem(MINDSET_KEY, JSON.stringify(mindsets));
+  }
+
+  function renderMindsets() {
+    const list = document.getElementById('mindsetList');
+    const count = document.getElementById('mindsetCount');
+
+    count.textContent = mindsets.length;
+
+    if (mindsets.length === 0) {
+      list.innerHTML = '<li class="mindset-empty">还没有记录，添加一条思维原则吧</li>';
+      return;
+    }
+
+    list.innerHTML = mindsets.map((m, i) =>
+      `<li class="mindset-item" draggable="true" data-mid="${m.id}">
+        <span class="drag-handle">⠿</span>
+        <span class="mindset-num">#${i + 1}</span>
+        <span class="mindset-text">${escapeHtml(m.text)}</span>
+        <span class="mindset-actions">
+          ${i > 0 ? '<button class="move-up" data-mup="' + m.id + '" title="上移">↑</button>' : ''}
+          ${i < mindsets.length - 1 ? '<button class="move-down" data-mdown="' + m.id + '" title="下移">↓</button>' : ''}
+          <button class="mindset-del" data-mdel="${m.id}" title="删除">✕</button>
+        </span>
+      </li>`
+    ).join('');
+  }
+
+  function addMindset() {
+    const input = document.getElementById('mindsetInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    mindsets.push({
+      id: Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      text: text,
+      createdAt: Date.now()
+    });
+
+    saveMindsets();
+    renderMindsets();
+    input.value = '';
+    input.focus();
+  }
+
+  function deleteMindset(id) {
+    mindsets = mindsets.filter(m => m.id !== id);
+    saveMindsets();
+    renderMindsets();
+  }
+
+  let editingMindsetId = null;
+
+  function startMindsetEdit(id) {
+    const m = mindsets.find(m => m.id === id);
+    if (!m) return;
+    if (editingMindsetId === id) return;
+    if (editingMindsetId) finishMindsetEdit(editingMindsetId, true);
+
+    editingMindsetId = id;
+    const li = document.querySelector(`li[data-mid="${id}"]`);
+    if (!li) { editingMindsetId = null; return; }
+
+    const textSpan = li.querySelector('.mindset-text');
+    if (!textSpan) { editingMindsetId = null; return; }
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'inline-edit-input';
+    input.value = m.text;
+    input.maxLength = 200;
+
+    textSpan.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  function finishMindsetEdit(id, save) {
+    if (editingMindsetId !== id) return;
+    editingMindsetId = null;
+
+    if (save) {
+      const input = document.querySelector(`li[data-mid="${id}"] .inline-edit-input`);
+      if (input) {
+        const newText = input.value.trim();
+        const m = mindsets.find(x => x.id === id);
+        if (m && newText) {
+          m.text = newText;
+          saveMindsets();
+        }
+      }
+    }
+    renderMindsets();
+  }
+
+  document.getElementById('mindsetAddBtn').addEventListener('click', addMindset);
+  document.getElementById('mindsetInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') addMindset();
+  });
+
+  function moveMindsetUp(id) {
+    const idx = mindsets.findIndex(m => m.id === id);
+    if (idx <= 0) return;
+    [mindsets[idx - 1], mindsets[idx]] = [mindsets[idx], mindsets[idx - 1]];
+    saveMindsets();
+    renderMindsets();
+  }
+
+  function moveMindsetDown(id) {
+    const idx = mindsets.findIndex(m => m.id === id);
+    if (idx === -1 || idx >= mindsets.length - 1) return;
+    [mindsets[idx], mindsets[idx + 1]] = [mindsets[idx + 1], mindsets[idx]];
+    saveMindsets();
+    renderMindsets();
+  }
+
+  loadMindsets();
+  renderMindsets();
+
+  loadTasks();
+  render();
+</script>
+</body>
+</html>
