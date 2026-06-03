@@ -1356,6 +1356,97 @@
       margin-right: auto;
     }
   }
+  /* ===== Celebration ===== */
+  .celebration-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: modalFadeIn 0.3s ease;
+  }
+  .celebration-overlay.show {
+    display: flex;
+  }
+  .celebration-box {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: 40px 36px 28px;
+    width: 400px;
+    max-width: 88vw;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    animation: celebrationSlideIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  @keyframes celebrationSlideIn {
+    from { opacity: 0; transform: translateY(30px) scale(0.88); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .celebration-icon {
+    font-size: 60px;
+    margin-bottom: 10px;
+    display: block;
+    animation: celebrationBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both;
+  }
+  @keyframes celebrationBounce {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+  }
+  .celebration-message {
+    font-size: 19px;
+    font-weight: 700;
+    color: #2d3436;
+    line-height: 1.7;
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
+  }
+  .celebration-sub {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.35);
+    margin-bottom: 24px;
+    letter-spacing: 0.3px;
+  }
+  .celebration-btn {
+    padding: 12px 36px;
+    background: linear-gradient(135deg, #f5b041, #ff9a76);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 14px rgba(245, 176, 65, 0.3);
+  }
+  .celebration-btn:hover {
+    opacity: 0.92;
+    transform: scale(1.03) translateY(-1px);
+    box-shadow: 0 6px 20px rgba(245, 176, 65, 0.4);
+  }
+  .celebration-btn:active {
+    transform: scale(0.97);
+  }
+  .celebration-confetti {
+    position: absolute;
+    pointer-events: none;
+    font-size: 22px;
+    animation: confettiFall 1.8s ease-out forwards;
+  }
+  @keyframes confettiFall {
+    0% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+    100% { opacity: 0; transform: translateY(100px) rotate(540deg) scale(0.2); }
+  }
 </style>
 </head>
 <body>
@@ -1893,9 +1984,14 @@
   function toggleTask(id) {
     const task = tasks.find(t => t.id === id);
     if (task) {
+      const wasDone = task.done;
       task.done = !task.done;
       saveTasks();
       render();
+      // 100% celebration: just completed a task AND all tasks are now done
+      if (!wasDone && task.done && tasks.every(t => t.done)) {
+        setTimeout(showCelebration, 350);
+      }
     }
   }
 
@@ -1903,6 +1999,36 @@
     tasks = tasks.filter(t => t.id !== id);
     saveTasks();
     render();
+  }
+
+  // ===== Celebration =====
+  const CELEBRATION_MESSAGES = [
+    '🎉 太棒了！今日任务全部完成，给自己点个赞！',
+    '🌟 今日任务圆满收官，你是最棒的！',
+    '✨ 任务清零！好好休息，明天继续加油！',
+    '🎊 恭喜完成今日所有任务，放松一下吧！',
+    '💪 今日任务全部搞定，每天都更优秀一步！',
+    '🏆 全任务达成！今天也是高效的一天！',
+    '🌈 完美收工！去做点让自己开心的事吧！',
+    '🎯 今日目标全部命中，太厉害了！',
+    '⭐ 今日任务全亮绿灯，值得好好犒劳自己！',
+    '🌸 今日事今日毕，你是执行力超强的人！',
+    '🚀 任务全部完成！每天进步一点，积少成多！',
+    '🎈 又完成了一天所有任务，坚持就是胜利！',
+    '🌻 今日满分完成任务，带着成就感好好休息！',
+    '🔥 今天是高效的一天！保持这个状态继续前进！',
+    '🍀 任务全部画上勾，奖励自己一小段轻松时光！',
+  ];
+
+  function showCelebration() {
+    const overlay = document.getElementById('celebrationOverlay');
+    const msgEl = document.getElementById('celebrationMessage');
+    const msg = CELEBRATION_MESSAGES[Math.floor(Math.random() * CELEBRATION_MESSAGES.length)];
+    msgEl.textContent = msg;
+    overlay.classList.add('show');
+  }
+  function hideCelebration() {
+    document.getElementById('celebrationOverlay').classList.remove('show');
   }
 
   let dragSourceId = null;
@@ -2487,5 +2613,16 @@
     }
   });
 </script>
+
+<!-- Celebration Overlay -->
+<div class="celebration-overlay" id="celebrationOverlay" onclick="if(event.target===this)hideCelebration()">
+  <div class="celebration-box">
+    <span class="celebration-icon">🎉</span>
+    <div class="celebration-message" id="celebrationMessage"></div>
+    <div class="celebration-sub">今天也是高效的一天 ✨</div>
+    <button class="celebration-btn" onclick="hideCelebration()">继续加油 💪</button>
+  </div>
+</div>
+
 </body>
 </html>
