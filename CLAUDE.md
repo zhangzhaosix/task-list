@@ -25,57 +25,43 @@
 
 ## 开发工作流
 
-### 重要流程变更
+### 核心流程
 
-> ⚠️ **用户测试优先，上传同步在后**
->
-> 所有代码修改仅限 `任务清单/` 目录，修改后用户先在本地测试确认满意，
-> **再由用户告知后进行 GitHub 上传和备份目录同步。**
-
-### 1. 修改代码
-
-所有修改均在 `任务清单/` 目录下进行。
-核心文件只有 `index.html`（纯前端单页面应用，HTML + CSS + JavaScript 全部在同一个文件中）。
-
-**仅修改此目录**，不允许修改 `任务清单-备份/` 目录下的任何文件。
-
-### 2. 本地测试
-
-修改完成后，用户在浏览器中打开 `任务清单/index.html` 进行测试。
-测试满意后告知 Claude，再进行下一步。
-
-### 3. 提交并推送至 GitHub（用户确认后执行）
-
-```bash
-cd 任务清单
-git add .
-git commit -m "本次修改内容描述"
-git push origin master
+```
+修改代码（index.html）
+  → 本地浏览器测试
+  → 用户反馈满意？
+     ├── 不满意 → 继续修改
+     └── 满意 → 执行上传同步三部曲
 ```
 
-### 4. 同步备份目录（用户确认后执行）
+### 第一步：修改代码
 
-提交并推送完主目录后，**必须同步更新备份目录**：
+所有修改仅在 `index.html` 中进行（唯一代码文件）。
+**不允许修改** `任务清单-备份/` 目录下的任何文件。
+
+### 第二步：本地测试
+
+在浏览器中直接打开 `index.html` 测试。
+测试满意后告知 Claude。
+
+### 第三步：上传同步（用户确认满意后执行）
+
+当用户说"可以了"/"没问题"/"满意"等确认信号后，执行：
 
 ```bash
-# 将主目录的文件复制到备份目录
+# 1) 主目录提交并推送至 GitHub
+cd 任务清单
+git add .
+git commit -m "修改内容描述"
+git push origin master
+
+# 2) 同步文件到本地备份目录（仅本地，不推送到 GitHub）
 cp 任务清单/index.html 任务清单-备份/index.html
 cp 任务清单/README.md 任务清单-备份/README.md
 
-# 备份目录也要提交并推送
-cd 任务清单-备份
-git add .
-git commit -m "同步: $(cd ../任务清单 && git log -1 --format=%s)"
-git push origin master
-```
-
-> **注意**：备份目录与主目录指向**同一个 GitHub 远程仓库**，两个目录各自维护独立的 commit 历史，但最终都会推送到同一个仓库。
-
-### 简化一键同步命令
-
-```bash
-# 如果觉得上面太繁琐，直接执行这个（在 聊天框1(每日清单网页) 目录下）：
-cd 任务清单 && git add . && git commit -m "update" && git push origin master && cd ../任务清单-备份 && cp ../任务清单/index.html . && cp ../任务清单/README.md . && git add . && git commit -m "sync" && git push origin master && cd ../任务清单
+# 3) 回到主目录
+cd ../任务清单
 ```
 
 ## 关于项目
@@ -87,3 +73,67 @@ cd 任务清单 && git add . && git commit -m "update" && git push origin master
 - 长期规划笔记
 - Firebase Auth 登录 + Firestore 云端同步
 - 数据导入/导出（JSON）
+
+## 技术架构
+
+### 数据模型
+
+**任务（Task）**
+```javascript
+{
+  id: string,          // Date.now() + 随机后缀
+  text: string,        // 任务标题
+  type: 'daily' | 'temporary',
+  done: boolean,
+  url: string,         // 相关链接（选填）
+  note: string,        // 备注（选填）
+  createdAt: number
+}
+```
+
+**思维模式（Mindset）**
+```javascript
+{
+  id: string,
+  text: string,
+  createdAt: number
+}
+```
+
+### 数据流
+
+```
+Firebase Auth 登录
+  → Firestore users/{uid} 文档 onSnapshot 实时订阅
+  → 所有 CRUD 操作通过 set() 写入 Firestore
+  → onSnapshot 回调触发 render() 刷新 UI
+  → 首次登录自动迁移 localStorage 存量数据到云端
+```
+
+### 核心模块（index.html 行号对照）
+
+| 模块 | 行号 | 说明 |
+|------|------|------|
+| 三步添加/编辑模态框 | 1774–1860 | 标题必填 + 链接+备注选填，Enter/Ctrl+Enter |
+| 内联编辑 | 1972–2027 | 点击文本直接编辑，Enter 保存 / Escape 取消 |
+| 拖拽排序 | 1878–1968 | HTML5 Drag & Drop，仅同类型任务内 |
+| 认证状态机 | 2092–2188 | 表单登录 / 一键登录 / 登出 |
+| 进度条 | 106–146 | 完成任务占比 + 微光动画 |
+| 思维模式 CRUD | 2287–2401 | 独立列表，支持排序、内联编辑 |
+| 长期规划文本 | 2191–2216 | 自动保存（500ms debounce）+ 字数统计 |
+| 数据导入/导出 | 2404–2448 | JSON 格式 |
+
+## CSS 设计系统
+
+- **风格**: 毛玻璃（Glassmorphism）
+  - 半透明背景（`rgba(255,255,255,0.12~0.3)`）
+  - `backdrop-filter: blur(8px~20px)`
+  - 白色半透明边框
+  - 柔和阴影 + `inset` 高光
+- **配色**: 暖橙渐变主题 `#f5b041 → #ff9a76`
+  - 每日必做 → 橙色系
+  - 临时事件 → 绿色系 `#00b894`
+  - 文字主色 `#2d3436`，辅助色 `#636e72`
+- **背景**: 多径向渐变叠加 + 固定模糊光斑 `div.bg-spot`
+- **响应式断点**: 860px（3→2列），600px（2→1列 + 移动端适配）
+- **动效**: 卡片悬停上移、进度条 shimmer 动画、任务入场 `taskIn` keyframe
