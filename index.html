@@ -1617,10 +1617,7 @@
     <span class="total-info" id="totalInfo"></span>
     <div class="footer-actions">
       <button class="clear-btn" id="clearBtn">清空已完成</button>
-      <button class="data-btn" id="exportBtn">导出数据</button>
-      <button class="data-btn" id="importBtn">导入数据</button>
       <button class="data-btn logout-btn" id="logoutBtn">退出登录</button>
-      <input type="file" id="importFile" accept=".json" style="display:none">
     </div>
   </div>
 
@@ -2587,53 +2584,6 @@
     saveMindsets();
     renderMindsets();
   }
-
-  // ===== Export / Import =====
-  function exportData() {
-    const data = {
-      tasks: JSON.stringify(tasks),
-      plan: planText ? planText.value : '',
-      mindsets: JSON.stringify(mindsets)
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = '每日任务清单_' + new Date().toISOString().slice(0, 10) + '.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function importData(file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        const data = JSON.parse(e.target.result);
-        if (data.tasks) tasks = JSON.parse(data.tasks);
-        if (data.mindsets) mindsets = JSON.parse(data.mindsets);
-        if (planText && data.plan) planText.value = data.plan;
-        render();
-        if (typeof renderMindsets === 'function') renderMindsets();
-        saveToFirestore().then(() => {
-          alert('数据导入成功！已同步到云端。');
-        });
-      } catch {
-        alert('导入失败：文件格式不正确');
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  document.getElementById('exportBtn').addEventListener('click', exportData);
-  document.getElementById('importBtn').addEventListener('click', function() {
-    document.getElementById('importFile').click();
-  });
-  document.getElementById('importFile').addEventListener('change', function(e) {
-    if (e.target.files.length > 0) {
-      importData(e.target.files[0]);
-      e.target.value = '';
-    }
-  });
 
   // ===== Logout =====
   document.getElementById('logoutBtn').addEventListener('click', function() {
