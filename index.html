@@ -1437,6 +1437,33 @@
   .celebration-btn:active {
     transform: scale(0.97);
   }
+  .celebration-btn-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .celebration-btn-secondary {
+    padding: 12px 28px;
+    background: rgba(255, 255, 255, 0.3);
+    color: rgba(0, 0, 0, 0.45);
+    border: 1.5px solid rgba(0, 0, 0, 0.1);
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+  }
+  .celebration-btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.2);
+    transform: scale(1.02) translateY(-1px);
+  }
+  .celebration-btn-secondary:active {
+    transform: scale(0.97);
+  }
   .celebration-confetti {
     position: absolute;
     pointer-events: none;
@@ -2193,6 +2220,10 @@
 
     if (!confirm(msg)) return;
 
+    resetCompletedTasks();
+  }
+
+  function resetCompletedTasks() {
     tasks = tasks.map(t => {
       if (t.done && t.type === 'daily') t.done = false;
       return t;
@@ -2620,7 +2651,10 @@
     <span class="celebration-icon">🎉</span>
     <div class="celebration-message" id="celebrationMessage"></div>
     <div class="celebration-sub">今天也是高效的一天 ✨</div>
-    <button class="celebration-btn" onclick="hideCelebration()">继续加油 💪</button>
+    <div class="celebration-btn-group">
+      <button class="celebration-btn" onclick="hideCelebration()">继续加油 💪</button>
+      <button class="celebration-btn-secondary" onclick="hideCelebration();setTimeout(resetCompletedTasks,100)">🔄 重置已完成</button>
+    </div>
   </div>
 </div>
 
