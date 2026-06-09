@@ -1572,7 +1572,9 @@
     <form id="loginForm" action="#" method="post">
       <input type="email" id="loginEmail" name="email" placeholder="邮箱" autocomplete="username" required>
       <input type="password" id="loginPassword" name="password" placeholder="密码" autocomplete="current-password" required>
+      <input type="password" id="loginConfirmPw" name="confirmPw" placeholder="确认密码" style="display:none" autocomplete="new-password">
       <button id="loginBtn" type="submit" class="primary-btn">登 录</button>
+      <button id="registerToggleBtn" type="button" class="link-btn" style="margin-top:10px">没有账号？注册</button>
     </form>
     <div id="quickLoginArea" style="display:none">
       <div class="saved-email" id="savedEmailDisplay"></div>
@@ -1840,12 +1842,15 @@
           }
         }
       } else {
-        if (tasks.length > 0 || mindsets.length > 0 || (planText && planText.value)) {
-          tasks = [];
-          mindsets = [];
-          changed = true;
-          migrateLocalData();
-        }
+        // 新用户（或首次登录）：清空一切残留数据，以空白状态开始
+        tasks = [];
+        mindsets = [];
+        if (planText) planText.value = '';
+        changed = true;
+        saveToFirestore(); // 创建空白文档
+        localStorage.removeItem('daily_tasks');
+        localStorage.removeItem('daily_tasks_plan');
+        localStorage.removeItem('daily_tasks_mindset');
       }
       if (changed) {
         render();
@@ -2322,18 +2327,19 @@
       ? '每日必做将重置为未完成，<br>临时事件将被删除。确定继续吗？'
       : '确定清空所有已完成的任务吗？';
 
-    showConfirmDialog(msg).then(function(confirmed) {
+    showConfirmDialog(msg, '确定清空').then(function(confirmed) {
       if (confirmed) resetCompletedTasks();
     });
   }
 
-  function showConfirmDialog(message) {
+  function showConfirmDialog(message, okText) {
     var overlay = document.getElementById('confirmOverlay');
     var msgEl = document.getElementById('confirmMessage');
     var cancelBtn = document.getElementById('confirmCancelBtn');
     var okBtn = document.getElementById('confirmOkBtn');
 
     msgEl.innerHTML = message;
+    okBtn.textContent = okText || '确定清空';
     overlay.style.display = 'flex';
 
     return new Promise(function(resolve) {
@@ -2411,22 +2417,27 @@
   const overlay = document.getElementById('loginOverlay');
   const loginEmail = document.getElementById('loginEmail');
   const loginPassword = document.getElementById('loginPassword');
+  const loginConfirmPw = document.getElementById('loginConfirmPw');
   const loginBtn = document.getElementById('loginBtn');
   const loginError = document.getElementById('loginError');
+  let isRegisterMode = false;
   const loginLoading = document.getElementById('loginLoading');
   const quickLoginArea = document.getElementById('quickLoginArea');
   const loginFormArea = document.getElementById('loginForm');
 
   function showLogin() {
     const savedEmail = localStorage.getItem('tasklist_email');
-    const savedPassword = localStorage.getItem('tasklist_password');
-    if (savedEmail && savedPassword) {
-      loginFormArea.style.display = 'none';
-      quickLoginArea.style.display = 'block';
-      document.getElementById('savedEmailDisplay').textContent = '📧 ' + savedEmail;
-    } else {
-      loginFormArea.style.display = 'block';
-      quickLoginArea.style.display = 'none';
+    loginFormArea.style.display = 'block';
+    quickLoginArea.style.display = 'none';
+    if (savedEmail) {
+      loginEmail.value = savedEmail;
+      loginPassword.focus();
+    }
+    if (isRegisterMode) {
+      isRegisterMode = false;
+      loginConfirmPw.style.display = 'none';
+      loginBtn.textContent = '登 录';
+      document.getElementById('registerToggleBtn').textContent = '没有账号？注册';
     }
     overlay.classList.remove('hidden');
   }
@@ -2456,18 +2467,33 @@
     const email = loginEmail.value.trim();
     const password = loginPassword.value;
     if (!email || !password) { loginError.textContent = '请输入邮箱和密码'; return; }
+    if (isRegisterMode) {
+      const confirm = loginConfirmPw.value;
+      if (password !== confirm) { loginError.textContent = '两次密码不一致'; return; }
+      if (password.length < 6) { loginError.textContent = '密码至少6位'; return; }
+    }
     loginLoading.style.display = 'block';
     loginError.textContent = '';
     loginBtn.disabled = true;
-    auth.signInWithEmailAndPassword(email, password)
+
+    const authPromise = isRegisterMode
+      ? auth.createUserWithEmailAndPassword(email, password)
+      : auth.signInWithEmailAndPassword(email, password);
+
+    authPromise
       .then(() => {
         localStorage.setItem('tasklist_email', email);
-        localStorage.setItem('tasklist_password', password);
       })
       .catch(err => {
-        loginError.textContent = err.message.includes('user-not-found') || err.message.includes('wrong-password') || err.message.includes('invalid-credential')
-          ? '邮箱或密码错误'
-          : err.message;
+        if (err.code === 'auth/email-already-in-use') {
+          loginError.textContent = '该邮箱已注册，请直接登录';
+        } else if (err.code === 'auth/weak-password') {
+          loginError.textContent = '密码太弱，至少6位';
+        } else {
+          loginError.textContent = err.message.includes('user-not-found') || err.message.includes('wrong-password') || err.message.includes('invalid-credential')
+            ? '邮箱或密码错误'
+            : err.message;
+        }
       })
       .finally(() => {
         loginLoading.style.display = 'none';
@@ -2475,34 +2501,27 @@
       });
   });
 
-  document.getElementById('quickLoginBtn').addEventListener('click', function() {
-    const email = localStorage.getItem('tasklist_email');
-    const password = localStorage.getItem('tasklist_password');
-    if (!email || !password) {
-      localStorage.removeItem('tasklist_email');
-      localStorage.removeItem('tasklist_password');
-      showLogin();
-      return;
-    }
-    loginLoading.style.display = 'block';
+  document.getElementById('registerToggleBtn').addEventListener('click', function() {
+    isRegisterMode = !isRegisterMode;
+    const isReg = isRegisterMode;
+    loginConfirmPw.style.display = isReg ? 'block' : 'none';
+    loginBtn.textContent = isReg ? '注 册' : '登 录';
+    this.textContent = isReg ? '已有账号？登录' : '没有账号？注册';
     loginError.textContent = '';
-    auth.signInWithEmailAndPassword(email, password)
-      .catch(err => {
-        localStorage.removeItem('tasklist_email');
-        localStorage.removeItem('tasklist_password');
-        showLogin();
-        loginError.textContent = '登录已失效，请重新输入密码';
-      })
-      .finally(() => {
-        loginLoading.style.display = 'none';
-      });
+    loginPassword.autocomplete = isReg ? 'new-password' : 'current-password';
   });
 
   document.getElementById('switchToFormBtn').addEventListener('click', function() {
     localStorage.removeItem('tasklist_email');
-    localStorage.removeItem('tasklist_password');
     loginEmail.value = '';
     loginPassword.value = '';
+    loginPassword.focus();
+    if (isRegisterMode) {
+      isRegisterMode = false;
+      loginConfirmPw.style.display = 'none';
+      loginBtn.textContent = '登 录';
+      document.getElementById('registerToggleBtn').textContent = '没有账号？注册';
+    }
     showLogin();
   });
 
@@ -2734,11 +2753,12 @@
 
   // ===== Logout =====
   document.getElementById('logoutBtn').addEventListener('click', function() {
-    if (confirm('确定要退出登录吗？退出后需要重新登录才能查看数据。')) {
-      localStorage.removeItem('tasklist_email');
-      localStorage.removeItem('tasklist_password');
-      auth.signOut();
-    }
+    showConfirmDialog('确定要退出登录吗？<br>退出后需要重新登录才能查看数据。', '退出登录').then(function(confirmed) {
+      if (confirmed) {
+        localStorage.removeItem('tasklist_email');
+        auth.signOut();
+      }
+    });
   });
 </script>
 
