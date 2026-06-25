@@ -32,6 +32,17 @@
     --shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.06);
     --shadow-md: 0 10px 26px rgba(15, 23, 42, 0.08);
     --shadow-lg: 0 16px 36px rgba(15, 23, 42, 0.10);
+    --stack-width: 1040px;
+    --stack-gap: clamp(22px, 4vh, 40px);
+    --stack-stick-top: clamp(30px, 11vh, 90px);
+    --stack-card-min: min(78dvh, 820px);
+    --stack-stage-min: calc(var(--stack-card-min) + 30dvh);
+    --stack-past-scale: 0.92;
+    --stack-past-y: 56px;
+    --stack-past-opacity: 0.4;
+    --stack-next-y: 52px;
+    --stack-radius: 30px;
+    --stack-ease: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   /* ===== Reset & Base ===== */
@@ -45,7 +56,7 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
     color: var(--ink);
     min-height: 100vh;
-    padding: 32px 16px 40px;
+    padding: 24px 16px 44px;
     line-height: 1.6;
     letter-spacing: 0.15px;
     position: relative;
@@ -67,16 +78,163 @@
 
   /* ===== Container (Clean Glass) ===== */
   .container {
-    max-width: 960px;
+    max-width: var(--stack-width);
     margin: 0 auto;
-    background: var(--surface);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-radius: 18px;
-    padding: 36px 32px;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid rgba(255, 255, 255, 0.58);
+    padding: 0 2px;
     position: relative;
+  }
+
+  .stack-sections {
+    position: relative;
+  }
+
+  .stack-section {
+    position: relative;
+    min-height: var(--stack-stage-min);
+    z-index: calc(10 + var(--stack-order, 0));
+  }
+
+  .stack-panel {
+    position: sticky;
+    top: var(--stack-stick-top);
+    pointer-events: none;
+  }
+
+  .section-card {
+    position: relative;
+    min-height: var(--stack-card-min);
+    padding: clamp(22px, 3vw, 34px);
+    border-radius: var(--stack-radius);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 252, 247, 0.88) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    box-shadow:
+      0 24px 54px rgba(102, 76, 33, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    overflow: clip;
+    pointer-events: auto;
+    transform-origin: center top;
+    transition:
+      transform 0.5s var(--stack-ease),
+      opacity 0.36s ease,
+      box-shadow 0.36s ease,
+      border-color 0.36s ease;
+  }
+
+  .section-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at top left, rgba(245, 176, 65, 0.14), transparent 36%),
+      radial-gradient(circle at 85% 20%, rgba(255, 154, 118, 0.12), transparent 26%),
+      linear-gradient(180deg, rgba(255,255,255,0.18), transparent 26%);
+    pointer-events: none;
+    opacity: 0.9;
+  }
+
+  .section-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .section-card::after {
+    content: '';
+    position: absolute;
+    inset: auto 18px 18px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(245, 176, 65, 0.45), transparent);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .stack-panel.is-past .section-card {
+    transform: translateY(calc(var(--stack-past-y) * -1)) scale(var(--stack-past-scale));
+    opacity: var(--stack-past-opacity);
+    box-shadow: 0 10px 28px rgba(102, 76, 33, 0.08);
+  }
+
+  .stack-panel.is-active .section-card {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+
+  .stack-panel.is-next .section-card {
+    transform: translateY(var(--stack-next-y)) scale(0.985);
+    opacity: 0.98;
+  }
+
+  .stack-panel.is-future .section-card {
+    transform: translateY(calc(var(--stack-next-y) + 36px)) scale(0.97);
+    opacity: 0.9;
+  }
+
+  @supports (animation-timeline: view()) {
+    html.has-scroll-timeline .stack-section .section-card::after {
+      animation: stackLineReveal linear both;
+      animation-timeline: view(block);
+      animation-range: entry 10% cover 42%;
+    }
+
+    @keyframes stackLineReveal {
+      from {
+        opacity: 0;
+        transform: scaleX(0.4);
+      }
+      to {
+        opacity: 1;
+        transform: scaleX(1);
+      }
+    }
+  }
+
+  .section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+
+  .section-head-copy {
+    display: grid;
+    gap: 6px;
+  }
+
+  .section-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(198, 107, 0, 0.72);
+  }
+
+  .section-title {
+    font-size: clamp(26px, 4vw, 38px);
+    line-height: 1.08;
+    letter-spacing: -0.04em;
+    text-wrap: balance;
+  }
+
+  .section-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(22, 32, 51, 0.68);
+    background: rgba(255, 255, 255, 0.64);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+  }
+
+  .section-badge strong {
+    font-size: 15px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
   }
 
   /* ===== Header ===== */
@@ -84,9 +242,9 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 10px;
   }
   header h1 {
     font-size: 28px;
@@ -131,6 +289,10 @@
     font-size: 14px;
     font-weight: 500;
     letter-spacing: 0.3px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(15, 23, 42, 0.08);
   }
 
   /* ===== Overview Panel ===== */
@@ -173,15 +335,15 @@
   }
   .overview-metrics {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
   .metric-card {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 116px;
-    padding: 14px 14px 13px;
+    min-height: 108px;
+    padding: 14px;
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.62);
     border: 1px solid rgba(15, 23, 42, 0.06);
@@ -202,6 +364,30 @@
   .metric-note {
     font-size: 12px;
     color: var(--muted);
+  }
+
+  .overview-meta {
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  .overview-status-card {
+    display: grid;
+    gap: 6px;
+    min-width: min(100%, 360px);
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
+  }
+
+  .overview-status-label {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-2);
   }
 
   /* ===== Glass Card Base ===== */
@@ -275,19 +461,21 @@
   /* ===== Add Section ===== */
   .add-section {
     display: flex;
-    gap: 10px;
-    margin-bottom: 22px;
+    align-items: center;
+    gap: 10px 12px;
+    margin-bottom: 18px;
     flex-wrap: wrap;
   }
   .add-section .input-group {
-    flex: 1;
+    flex: 1 1 620px;
     display: flex;
     background: rgba(255, 255, 255, 0.62);
     border: 1.5px solid rgba(15, 23, 42, 0.07);
     border-radius: 14px;
     overflow: hidden;
     transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
-    min-width: 200px;
+    min-width: 260px;
+    max-width: 760px;
   }
   .add-section .input-group:focus-within {
     border-color: rgba(245, 176, 65, 0.58);
@@ -296,10 +484,11 @@
   }
   .add-section .input-group input {
     flex: 1;
-    padding: 12px 16px;
+    min-width: 0;
+    padding: 11px 15px;
     border: none;
     border-radius: 14px 0 0 14px;
-    font-size: 15px;
+    font-size: 14px;
     outline: none;
     background: transparent;
     font-family: inherit;
@@ -309,7 +498,7 @@
     color: rgba(22, 32, 51, 0.28);
   }
   .add-section .input-group #addBtn {
-    padding: 12px 22px;
+    padding: 11px 20px;
     background: linear-gradient(135deg, #f5b041, #ff9a76);
     color: #fff;
     border: none;
@@ -333,10 +522,11 @@
     display: flex;
     gap: 6px;
     flex-shrink: 0;
-    align-self: center;
+    align-self: stretch;
   }
   .add-section .type-btn {
-    padding: 9px 16px;
+    min-height: 44px;
+    padding: 10px 16px;
     border: 1.5px solid rgba(15, 23, 42, 0.07);
     border-radius: 10px;
     font-size: 13px;
@@ -368,16 +558,8 @@
 
   /* ===== Mindset Section ===== */
   .mindset-section {
-    border-radius: 14px;
-    padding: 20px 18px 16px;
-    margin-bottom: 24px;
-    background: rgba(255, 255, 255, 0.48);
-    border: 1px solid rgba(255, 255, 255, 0.52);
-    transition: background 0.3s, box-shadow 0.3s;
-  }
-  .mindset-section:hover {
-    background: rgba(255, 255, 255, 0.62);
-    box-shadow: var(--shadow-sm);
+    display: grid;
+    gap: 16px;
   }
   .mindset-section .mindset-header {
     font-size: 12px;
@@ -385,7 +567,6 @@
     text-transform: uppercase;
     letter-spacing: 0.6px;
     color: var(--accent);
-    margin-bottom: 14px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -399,13 +580,19 @@
     margin-left: auto;
   }
   .mindset-input-wrap {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
   }
   .mindset-input-wrap input {
-    flex: 1;
-    padding: 10px 14px;
+    min-width: 0;
+    padding: 10px 13px;
     border: 1.5px solid rgba(0, 0, 0, 0.06);
     border-radius: 10px;
     font-size: 13px;
@@ -421,7 +608,8 @@
     box-shadow: 0 0 0 3px rgba(245, 176, 65, 0.08);
   }
   .mindset-input-wrap button {
-    padding: 10px 18px;
+    min-height: 42px;
+    padding: 10px 16px;
     background: linear-gradient(135deg, #f5b041, #ff9a76);
     color: #fff;
     border: none;
@@ -439,17 +627,36 @@
 
   .mindset-list {
     list-style: none;
+    display: grid;
+    gap: 10px;
+  }
+
+  #mindsetList,
+  #dailyList,
+  #tempList {
+    max-height: clamp(260px, 42vh, 520px);
+    overflow: auto;
+    padding-right: 4px;
+    align-content: start;
+    scrollbar-gutter: stable;
+  }
+
+  #mindsetList:empty,
+  #dailyList:empty,
+  #tempList:empty {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
   .mindset-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 10px;
-    background: rgba(255, 255, 255, 0.36);
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.56);
     border-radius: 10px;
-    margin-bottom: 4px;
     transition: background 0.2s, transform 0.2s;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(15, 23, 42, 0.07);
   }
   .mindset-item:hover {
     background: rgba(255, 255, 255, 0.62);
@@ -507,38 +714,30 @@
 
   .mindset-empty {
     text-align: center;
-    padding: 16px;
-    color: var(--muted-2);
-    font-size: 13px;
+    padding: 26px 18px;
+    color: var(--muted);
+    font-size: 14px;
     font-weight: 500;
+    border: 1px dashed rgba(15, 23, 42, 0.14);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.48);
   }
 
-  /* ===== Pending Stack ===== */
-  .pending-stack {
-    margin-bottom: 28px;
-  }
   .pending-col {
-    border-radius: 14px;
-    padding: 20px;
-    margin-bottom: 18px;
-    background: rgba(255, 255, 255, 0.44);
-    border: 1px solid rgba(255, 255, 255, 0.52);
-    transition: background 0.3s, box-shadow 0.3s;
-  }
-  .pending-col:hover {
-    background: rgba(255, 255, 255, 0.58);
-    box-shadow: var(--shadow-sm);
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
   }
   .pending-col .col-header {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    margin-bottom: 14px;
+    letter-spacing: 0.06em;
+    margin-bottom: 18px;
     display: flex;
     align-items: center;
     gap: 8px;
-    color: rgba(22, 32, 51, 0.58);
+    color: rgba(22, 32, 51, 0.72);
   }
   .pending-col .col-header .tag {
     font-size: 11px;
@@ -572,9 +771,9 @@
 
   /* ===== Completed Subsection (collapsible inside each column) ===== */
   .completed-subsection {
-    margin-top: 14px;
-    border-top: 1px solid rgba(15, 23, 42, 0.06);
-    padding-top: 10px;
+    margin-top: 18px;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    padding-top: 14px;
   }
   .completed-toggle {
     display: flex;
@@ -607,9 +806,10 @@
     color: rgba(22, 32, 51, 0.44);
   }
   .completed-list {
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     transition: max-height 0.3s ease, opacity 0.2s ease;
-    max-height: 2000px;
+    max-height: clamp(220px, 32vh, 420px);
     opacity: 1;
   }
   .completed-list.collapsed {
@@ -958,32 +1158,39 @@
   /* ===== Empty State ===== */
   .empty-state {
     text-align: center;
-    padding: 24px 12px;
-    color: var(--muted-2);
-    font-size: 13px;
+    padding: 30px 16px;
+    color: var(--muted);
+    font-size: 14px;
     font-weight: 500;
     letter-spacing: 0.3px;
     grid-column: 1 / -1;
+    border-radius: 18px;
+    border: 1px dashed rgba(15, 23, 42, 0.12);
+    background: rgba(255, 255, 255, 0.52);
   }
 
   /* ===== Footer ===== */
-  .footer-bar {
+  .total-info {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
     flex-wrap: wrap;
-    gap: 10px;
-    padding-top: 18px;
-    border-top: 1px solid rgba(15, 23, 42, 0.06);
-  }
-  .footer-bar .total-info {
+    align-items: center;
+    gap: 4px 8px;
     font-size: 13px;
     color: var(--muted);
     font-weight: 500;
     letter-spacing: 0.2px;
   }
+  .footer-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 18px 8px 0;
+  }
   .clear-btn {
-    padding: 7px 18px;
+    padding: 12px 18px;
     background: rgba(255, 255, 255, 0.50);
     border: 1.5px solid rgba(15, 23, 42, 0.07);
     border-radius: 10px;
@@ -1006,7 +1213,7 @@
     flex-wrap: wrap;
   }
   .data-btn {
-    padding: 7px 14px;
+    padding: 12px 14px;
     background: rgba(255, 255, 255, 0.50);
     border: 1.5px solid rgba(15, 23, 42, 0.07);
     border-radius: 10px;
@@ -1181,43 +1388,42 @@
     align-items: center;
     gap: 4px;
     font-size: 11px;
-    color: rgba(0, 0, 0, 0.20);
-    margin-left: 8px;
-    font-weight: 400;
+    color: rgba(22, 32, 51, 0.44);
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.04);
+    font-weight: 500;
   }
 
   /* ===== Long-term Planning ===== */
   .plan-section {
-    margin-top: 28px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(15, 23, 42, 0.06);
+    margin-top: 0;
   }
   .plan-section .plan-header {
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--muted);
-    margin-bottom: 12px;
+    letter-spacing: 0.08em;
+    color: rgba(198, 107, 0, 0.72);
+    margin-bottom: 14px;
     display: flex;
     align-items: center;
     gap: 8px;
   }
   .plan-section textarea {
     width: 100%;
-    padding: 14px 16px;
+    padding: 18px 18px 18px 20px;
     border: 1.5px solid rgba(15, 23, 42, 0.07);
-    border-radius: 14px;
+    border-radius: 22px;
     font-size: 14px;
     font-family: inherit;
     line-height: 1.8;
     outline: none;
     resize: none;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.52);
+    background: rgba(255, 255, 255, 0.72);
     color: #475569;
     transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-    min-height: 56px;
+    min-height: 280px;
     letter-spacing: 0.2px;
   }
   .plan-section textarea:focus {
@@ -1234,6 +1440,9 @@
     align-items: center;
     margin-top: 8px;
     font-size: 12px;
+  }
+  .plan-word-count {
+    color: rgba(22, 32, 51, 0.34);
   }
   .plan-section .plan-save-hint {
     color: var(--muted-2);
@@ -1438,11 +1647,17 @@
 
   /* ===== Responsive ===== */
   @media (max-width: 900px) {
+    .stack-section {
+      min-height: calc(var(--stack-card-min) + 24dvh);
+    }
     .overview-panel {
       grid-template-columns: 1fr;
     }
+    .overview-meta {
+      grid-template-columns: 1fr;
+    }
     .overview-metrics {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .task-list {
       grid-template-columns: repeat(2, 1fr);
@@ -1453,8 +1668,29 @@
   }
 
   @media (max-width: 620px) {
-    body { padding: 10px 6px; }
-    .container { padding: 18px 14px; border-radius: 18px; }
+    body { padding: 10px 6px 28px; }
+    .container { padding: 0; }
+    .stack-section {
+      min-height: auto;
+      padding-bottom: 22px;
+    }
+    .stack-panel {
+      position: relative;
+      top: 0;
+    }
+    .section-card {
+      min-height: auto;
+      padding: 18px 14px;
+      border-radius: 24px;
+      transform: none !important;
+      opacity: 1 !important;
+    }
+    .section-head {
+      margin-bottom: 18px;
+    }
+    .section-title {
+      font-size: 24px;
+    }
     header h1 { font-size: 22px; }
     header { gap: 4px; }
     .overview-panel {
@@ -1471,9 +1707,20 @@
       min-height: 92px;
     }
     .add-section { gap: 8px; }
-    .add-section .input-group { min-width: 100%; }
+    .add-section .input-group { min-width: 100%; max-width: none; }
     .add-section .type-selector { align-self: stretch; }
     .add-section .type-btn { flex: 1; text-align: center; }
+    .mindset-input-wrap {
+      grid-template-columns: 1fr;
+      display: grid;
+    }
+
+    #mindsetList,
+    #dailyList,
+    #tempList,
+    .completed-list {
+      max-height: clamp(220px, 36vh, 360px);
+    }
 
     .task-list {
       grid-template-columns: 1fr;
@@ -1484,8 +1731,6 @@
 
     .task-item { height: 170px; }
     .task-item .actions { opacity: 1; }
-    .pending-col { padding: 14px; }
-    .mindset-section { padding: 14px 12px; }
     .mindset-item .mindset-actions { opacity: 1; }
     .drag-handle {
       position: static;
@@ -1502,6 +1747,26 @@
     .clear-btn, .data-btn {
       text-align: center;
       flex: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stack-panel.is-past .section-card,
+    .stack-panel.is-active .section-card,
+    .stack-panel.is-next .section-card,
+    .stack-panel.is-future .section-card {
+      transform: none !important;
+      opacity: 1 !important;
+    }
+
+    .stack-section {
+      min-height: auto;
+      padding-bottom: 18px;
+    }
+
+    .stack-panel {
+      position: relative;
+      top: 0;
     }
   }
   /* ===== Celebration ===== */
@@ -1721,58 +1986,181 @@
 </div>
 
 <div class="container">
-  <header>
-    <h1><span class="icon-wrap"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> 今日任务</h1>
-    <span id="dateDisplay"></span>
-  </header>
+  <div class="stack-sections" id="stackSections">
+    <section class="stack-section" data-stack-section>
+      <div class="stack-panel">
+        <div class="section-card">
+          <header>
+            <h1><span class="icon-wrap"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> 今日任务</h1>
+            <span id="dateDisplay"></span>
+          </header>
 
-  <section class="overview-panel" aria-label="今日概览">
-    <div class="overview-copy">
-      <div class="overview-kicker">Today Overview</div>
-      <div class="overview-title" id="overviewTitle">把最重要的事情先做完</div>
-      <div class="overview-subcopy" id="overviewSubcopy">任务、心态和长期规划放在同一屏，先看状态，再开始处理今天的清单。</div>
-    </div>
-    <div class="overview-metrics">
-      <div class="metric-card">
-        <span class="metric-label">待完成</span>
-        <strong class="metric-value" id="overviewPending">0</strong>
-        <span class="metric-note">今日任务</span>
-      </div>
-      <div class="metric-card">
-        <span class="metric-label">完成率</span>
-        <strong class="metric-value" id="overviewPercent">0%</strong>
-        <span class="metric-note">当前进度</span>
-      </div>
-      <div class="metric-card">
-        <span class="metric-label">长期规划</span>
-        <strong class="metric-value" id="overviewPlanWords">0</strong>
-        <span class="metric-note">字</span>
-      </div>
-    </div>
-  </section>
+          <section class="overview-panel" aria-label="今日概览">
+            <div class="overview-copy">
+              <div class="overview-kicker">Today Overview</div>
+              <div class="overview-title" id="overviewTitle">把最重要的事情先做完</div>
+              <div class="overview-subcopy" id="overviewSubcopy">先看状态，再开始处理今天的清单，让今天的主线保持清楚。</div>
+            </div>
+            <div class="overview-metrics">
+              <div class="metric-card">
+                <span class="metric-label">待完成</span>
+                <strong class="metric-value" id="overviewPending">0</strong>
+                <span class="metric-note">今日任务</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">完成率</span>
+                <strong class="metric-value" id="overviewPercent">0%</strong>
+                <span class="metric-note">当前进度</span>
+              </div>
+            </div>
+          </section>
 
-  <!-- Progress Bar -->
-  <div class="progress-wrap">
-    <div class="progress-bar">
-      <div class="fill" id="progressFill"></div>
-    </div>
-    <span class="progress-text" id="progressText">0%</span>
+          <div class="progress-wrap">
+            <div class="progress-bar">
+              <div class="fill" id="progressFill"></div>
+            </div>
+            <span class="progress-text" id="progressText">0%</span>
+          </div>
+
+          <div class="add-section">
+            <div class="input-group">
+              <label class="sr-only" for="taskInput">任务</label>
+              <input type="text" id="taskInput" placeholder="按 Enter 开始填写任务..." autofocus>
+              <button id="addBtn">添加</button>
+            </div>
+            <div class="type-selector">
+              <button class="type-btn daily active" data-type="daily">每日必做</button>
+              <button class="type-btn temp" data-type="temporary">临时事件</button>
+            </div>
+          </div>
+
+          <div class="overview-meta">
+            <div class="overview-status-card">
+              <span class="overview-status-label">当前同步状态</span>
+              <span class="total-info" id="totalInfo"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="stack-section" data-stack-section>
+      <div class="stack-panel">
+        <div class="section-card">
+          <div class="section-head">
+            <div class="section-head-copy">
+              <span class="section-label">Mindset</span>
+              <h2 class="section-title">思维模式</h2>
+            </div>
+            <span class="section-badge">已记录 <strong id="mindsetCount">0</strong> 条</span>
+          </div>
+
+          <div class="mindset-section">
+            <div class="mindset-header">
+              思维模式清单
+            </div>
+            <div class="mindset-input-wrap">
+              <label class="sr-only" for="mindsetInput">思维模式</label>
+              <input type="text" id="mindsetInput" placeholder="记录一条工作/生活原则..." maxlength="200">
+              <button id="mindsetAddBtn">添加</button>
+            </div>
+            <ul class="mindset-list" id="mindsetList"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="stack-section" data-stack-section>
+      <div class="stack-panel">
+        <div class="section-card">
+          <div class="section-head">
+            <div class="section-head-copy">
+              <span class="section-label">Daily Core</span>
+              <h2 class="section-title">每日必做</h2>
+            </div>
+            <span class="section-badge">待完成 <strong id="dailyCount">0</strong> 项</span>
+          </div>
+
+          <div class="pending-col">
+            <div class="col-header">
+              <span class="tag daily-tag">每日必做</span>
+            </div>
+            <ul class="task-list" id="dailyList"></ul>
+            <div class="completed-subsection" id="dailyCompletedSection">
+              <div class="completed-toggle" data-type="daily">
+                已完成
+                <span class="count" id="dailyCompletedCount">0</span>
+                <span class="toggle-arrow collapsed">▾</span>
+              </div>
+              <ul class="task-list completed-list collapsed" id="dailyCompletedList"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="stack-section" data-stack-section>
+      <div class="stack-panel">
+        <div class="section-card">
+          <div class="section-head">
+            <div class="section-head-copy">
+              <span class="section-label">Temporary</span>
+              <h2 class="section-title">临时事件</h2>
+            </div>
+            <span class="section-badge">待处理 <strong id="tempCount">0</strong> 项</span>
+          </div>
+
+          <div class="pending-col">
+            <div class="col-header">
+              <span class="tag temp-tag">临时事件</span>
+            </div>
+            <ul class="task-list" id="tempList"></ul>
+            <div class="completed-subsection" id="tempCompletedSection">
+              <div class="completed-toggle" data-type="temp">
+                已完成
+                <span class="count" id="tempCompletedCount">0</span>
+                <span class="toggle-arrow collapsed">▾</span>
+              </div>
+              <ul class="task-list completed-list collapsed" id="tempCompletedList"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="stack-section" data-stack-section>
+      <div class="stack-panel">
+        <div class="section-card">
+          <div class="section-head">
+            <div class="section-head-copy">
+              <span class="section-label">Long-term Plan</span>
+              <h2 class="section-title">长期规划</h2>
+            </div>
+          </div>
+
+          <div class="plan-section">
+            <div class="plan-header">长期规划卡片</div>
+            <label class="sr-only" for="planText">长期规划</label>
+            <textarea id="planText" placeholder="1. 长期目标&#10;2. 当前阶段&#10;3. 下一步动作"></textarea>
+            <div class="plan-footer">
+              <span class="plan-save-hint" id="planHint">自动保存</span>
+              <span class="plan-word-count" id="planWordCount">0 字</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 
-  <!-- Add -->
-  <div class="add-section">
-    <div class="input-group">
-      <label class="sr-only" for="taskInput">任务</label>
-      <input type="text" id="taskInput" placeholder="按 Enter 开始填写任务..." autofocus>
-      <button id="addBtn">添加</button>
-    </div>
-    <div class="type-selector">
-      <button class="type-btn daily active" data-type="daily">每日必做</button>
-      <button class="type-btn temp" data-type="temporary">临时事件</button>
+  <!-- Footer -->
+  <div class="footer-bar">
+    <div class="footer-actions">
+      <button class="clear-btn" id="clearBtn">清空已完成</button>
+      <button class="data-btn logout-btn" id="logoutBtn">退出登录</button>
     </div>
   </div>
 
-<!-- ===== Add / Edit Task Modal (Single-panel form) ===== -->
+  <!-- ===== Add / Edit Task Modal (Single-panel form) ===== -->
   <div class="modal-overlay" id="addTaskModal" style="display:none">
     <div class="modal-box">
       <div class="modal-header-simple">
@@ -1780,9 +2168,8 @@
         <button class="modal-close-btn" id="modalCloseBtn">✕</button>
       </div>
 
-      <!-- Title (required) -->
       <div class="modal-field">
-        <label class="modal-label">
+        <label class="modal-label" for="modalInput1">
           任务标题
           <span class="required-hint">*必填</span>
           <span class="modal-field-tip">Enter 提交 · Ctrl+Enter 换行</span>
@@ -1790,18 +2177,16 @@
         <textarea class="modal-input modal-textarea" id="modalInput1" placeholder="例：背逐字稿，提高面试表达" aria-label="任务标题" rows="2"></textarea>
       </div>
 
-      <!-- URL (optional) -->
       <div class="modal-field">
-        <label class="modal-label">
+        <label class="modal-label" for="modalInput2">
           相关链接
           <span class="optional-hint">选填</span>
         </label>
         <input type="text" class="modal-input" id="modalInput2" placeholder="例：https://example.com/doc..." aria-label="相关链接" autocomplete="off">
       </div>
 
-      <!-- Note (optional) -->
       <div class="modal-field">
-        <label class="modal-label">
+        <label class="modal-label" for="modalInput3">
           备注
           <span class="optional-hint">选填</span>
         </label>
@@ -1812,74 +2197,6 @@
         <button class="modal-btn modal-btn-ghost" id="modalCancel">取消</button>
         <button class="modal-btn modal-btn-primary" id="modalSubmit">✅ 添加</button>
       </div>
-    </div>
-  </div>
-
-  <!-- Mindset -->
-  <div class="mindset-section">
-    <div class="mindset-header">
-      思维模式
-      <span class="count" id="mindsetCount">0</span>
-    </div>
-    <div class="mindset-input-wrap">
-      <label class="sr-only" for="mindsetInput">思维模式</label>
-      <input type="text" id="mindsetInput" placeholder="记录一条工作/生活原则..." maxlength="200">
-      <button id="mindsetAddBtn">添加</button>
-    </div>
-    <ul class="mindset-list" id="mindsetList"></ul>
-  </div>
-
-<!-- Pending -->
-  <div class="pending-stack">
-    <div class="pending-col">
-      <div class="col-header">
-        <span class="tag daily-tag">每日必做</span>
-        <span class="count" id="dailyCount">0</span>
-      </div>
-      <ul class="task-list" id="dailyList"></ul>
-      <div class="completed-subsection" id="dailyCompletedSection">
-        <div class="completed-toggle" data-type="daily">
-          已完成
-          <span class="count" id="dailyCompletedCount">0</span>
-          <span class="toggle-arrow collapsed">▾</span>
-        </div>
-        <ul class="task-list completed-list collapsed" id="dailyCompletedList"></ul>
-      </div>
-    </div>
-    <div class="pending-col">
-      <div class="col-header">
-        <span class="tag temp-tag">临时事件</span>
-        <span class="count" id="tempCount">0</span>
-      </div>
-      <ul class="task-list" id="tempList"></ul>
-      <div class="completed-subsection" id="tempCompletedSection">
-        <div class="completed-toggle" data-type="temp">
-          已完成
-          <span class="count" id="tempCompletedCount">0</span>
-          <span class="toggle-arrow collapsed">▾</span>
-        </div>
-        <ul class="task-list completed-list collapsed" id="tempCompletedList"></ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="footer-bar">
-    <span class="total-info" id="totalInfo"></span>
-    <div class="footer-actions">
-      <button class="clear-btn" id="clearBtn">清空已完成</button>
-      <button class="data-btn logout-btn" id="logoutBtn">退出登录</button>
-    </div>
-  </div>
-
-  <!-- Long-term Planning -->
-  <div class="plan-section">
-    <div class="plan-header">长期规划</div>
-    <label class="sr-only" for="planText">长期规划</label>
-    <textarea id="planText" placeholder="在这里记录长期规划、目标、想法……"></textarea>
-    <div class="plan-footer">
-      <span class="plan-save-hint" id="planHint">自动保存</span>
-      <span style="color: rgba(0,0,0,0.2);" id="planWordCount">0 字</span>
     </div>
   </div>
 </div>
@@ -1961,25 +2278,22 @@
     const done = tasks.filter(t => t.done).length;
     const pending = total - done;
     const percent = total ? Math.round((done / total) * 100) : 0;
-    const planWords = planText ? planText.value.trim().length : 0;
 
     const overviewPending = document.getElementById('overviewPending');
     const overviewPercent = document.getElementById('overviewPercent');
-    const overviewPlanWords = document.getElementById('overviewPlanWords');
     const overviewTitle = document.getElementById('overviewTitle');
     const overviewSubcopy = document.getElementById('overviewSubcopy');
 
     if (overviewPending) overviewPending.textContent = pending;
     if (overviewPercent) overviewPercent.textContent = percent + '%';
-    if (overviewPlanWords) overviewPlanWords.textContent = planWords;
 
     if (overviewTitle && overviewSubcopy) {
       if (total === 0) {
         overviewTitle.textContent = '把第一件事先写下来';
-        overviewSubcopy.textContent = '先创建一个任务，页面会自动把进度、心态和长期规划整理成清晰的状态。';
+        overviewSubcopy.textContent = '先创建一个任务，页面会把进度和今天的状态整理清楚。';
       } else if (pending === 0) {
         overviewTitle.textContent = '今天的清单已经全部完成';
-        overviewSubcopy.textContent = '现在可以整理长期规划，或者直接让自己休息一下。';
+        overviewSubcopy.textContent = '现在可以收尾整理，或者直接让自己休息一下。';
       } else if (done === 0) {
         overviewTitle.textContent = '今天有 ' + pending + ' 项待完成';
         overviewSubcopy.textContent = '先完成最重要的一项，再继续推进后面的事情。';
@@ -1988,6 +2302,65 @@
         overviewSubcopy.textContent = '保持节奏，先做高优先级任务，再处理剩余事项。';
       }
     }
+  }
+
+  let stackSections = [];
+  let stackRaf = 0;
+
+  function updateStackState() {
+    stackRaf = 0;
+    if (!stackSections.length) return;
+
+    const anchor = window.innerHeight * 0.48;
+    let activeIndex = stackSections.findIndex(section => {
+      const rect = section.getBoundingClientRect();
+      return rect.top <= anchor && rect.bottom >= anchor;
+    });
+
+    if (activeIndex === -1) {
+      let closestIndex = 0;
+      let minDistance = Infinity;
+      stackSections.forEach((section, index) => {
+        const rect = section.getBoundingClientRect();
+        const distance = Math.abs(rect.top - anchor);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestIndex = index;
+        }
+      });
+      activeIndex = closestIndex;
+    }
+
+    stackSections.forEach((section, index) => {
+      const panel = section.querySelector('.stack-panel');
+      if (!panel) return;
+      panel.classList.toggle('is-active', index === activeIndex);
+      panel.classList.toggle('is-past', index < activeIndex);
+      panel.classList.toggle('is-next', index === activeIndex + 1);
+      panel.classList.toggle('is-future', index > activeIndex + 1);
+    });
+  }
+
+  function requestStackState() {
+    if (stackRaf) return;
+    stackRaf = requestAnimationFrame(updateStackState);
+  }
+
+  function initStackSections() {
+    stackSections = Array.from(document.querySelectorAll('[data-stack-section]'));
+    if (!stackSections.length) return;
+
+    if (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('animation-timeline: view()')) {
+      document.documentElement.classList.add('has-scroll-timeline');
+    }
+
+    stackSections.forEach((section, index) => {
+      section.style.setProperty('--stack-order', index);
+    });
+
+    window.addEventListener('scroll', requestStackState, { passive: true });
+    window.addEventListener('resize', requestStackState, { passive: true });
+    requestStackState();
   }
 
   // ===== Firestore =====
@@ -2122,11 +2495,11 @@
     updateOverview();
 
     dailyList.innerHTML = daily.length === 0
-      ? '<li class="empty-state">暂无每日必做</li>'
+      ? '<li class="empty-state">今天还没有每日必做，先写下最重要的一项。</li>'
       : daily.map(t => renderItem(t)).join('');
 
     tempList.innerHTML = temp.length === 0
-      ? '<li class="empty-state">暂无临时事件</li>'
+      ? '<li class="empty-state">暂无临时事件，先把注意力留给今天的主线任务。</li>'
       : temp.map(t => renderItem(t)).join('');
 
     dailyCompletedList.innerHTML = dailyDone.length === 0
@@ -2156,8 +2529,7 @@
     if (linkUrl) {
       const domainFirst = domain.charAt(0).toUpperCase();
       faviconHtml = '<div class="task-favicon">'
-        + '<img class="task-favicon-img" src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=32" '
-        + 'alt="" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'<div class=task-favicon-placeholder>' + escapeHtml(domainFirst) + '</div>\'">'
+        + '<div class="task-favicon-placeholder">' + escapeHtml(domainFirst) + '</div>'
         + '</div>';
     }
 
@@ -2641,6 +3013,8 @@
 
   function hideLogin() { overlay.classList.add('hidden'); }
 
+  initStackSections();
+
   auth.onAuthStateChanged(u => {
     if (u) {
       user = u;
@@ -2843,7 +3217,7 @@
     count.textContent = mindsets.length;
 
     if (mindsets.length === 0) {
-      list.innerHTML = '<li class="mindset-empty">还没有记录，添加一条思维原则吧</li>';
+      list.innerHTML = '<li class="mindset-empty">还没有记录。先写下一条你今天最想坚持的思维原则。</li>';
       return;
     }
 
