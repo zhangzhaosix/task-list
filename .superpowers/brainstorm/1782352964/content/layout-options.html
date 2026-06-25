@@ -1,0 +1,183 @@
+<style>
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    align-items: start;
+  }
+  .stack-card {
+    border: 1px solid rgba(148, 115, 55, 0.18);
+    border-radius: 24px;
+    padding: 18px;
+    background: linear-gradient(180deg, #fffdf9 0%, #f8f2e7 100%);
+    box-shadow: 0 18px 42px rgba(120, 91, 46, 0.12);
+  }
+  .stack-caption {
+    font-size: 12px;
+    color: #8c6b37;
+    margin-bottom: 10px;
+    letter-spacing: 0.04em;
+  }
+  .stack-stage {
+    height: 520px;
+    border-radius: 20px;
+    background:
+      linear-gradient(180deg, rgba(247, 241, 230, 0.9), rgba(255, 252, 246, 0.96));
+    padding: 20px 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .mock-panel {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    min-height: 92px;
+    border-radius: 22px;
+    border: 1px solid rgba(130, 96, 40, 0.12);
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 16px 34px rgba(88, 66, 34, 0.10);
+    padding: 14px;
+  }
+  .mock-panel::before {
+    content: "";
+    display: block;
+    width: 54px;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(245, 176, 65, 0.34);
+    margin-bottom: 10px;
+  }
+  .mock-line {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(36, 36, 36, 0.09);
+    margin-bottom: 8px;
+  }
+  .mock-line.short { width: 38%; }
+  .mock-line.mid { width: 64%; }
+  .mock-line.long { width: 88%; }
+  .mock-chips {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .mock-chip {
+    height: 28px;
+    border-radius: 999px;
+    background: rgba(245, 176, 65, 0.14);
+    border: 1px solid rgba(245, 176, 65, 0.22);
+    flex: 1;
+  }
+  .mock-chip.alt {
+    background: rgba(13, 148, 136, 0.10);
+    border-color: rgba(13, 148, 136, 0.18);
+  }
+  .mock-card-stack-a .p1 { top: 24px; transform: scale(0.88) translateY(-26px); opacity: 0.34; }
+  .mock-card-stack-a .p2 { top: 78px; transform: scale(0.94) translateY(-12px); opacity: 0.62; }
+  .mock-card-stack-a .p3 { top: 148px; min-height: 214px; }
+  .mock-card-stack-a .p4 { top: 340px; min-height: 156px; transform: scale(0.97); opacity: 0.94; }
+  .mock-card-stack-a .footer {
+    position: absolute;
+    left: 36px;
+    right: 36px;
+    bottom: 18px;
+    height: 42px;
+    border-radius: 14px;
+    border: 1px dashed rgba(130, 96, 40, 0.22);
+    background: rgba(255,255,255,0.56);
+  }
+  .mock-card-stack-b .p1 { top: 22px; transform: scale(0.86) translateY(-28px); opacity: 0.28; }
+  .mock-card-stack-b .p2 { top: 84px; transform: scale(0.92) translateY(-16px); opacity: 0.54; }
+  .mock-card-stack-b .p3 { top: 160px; min-height: 174px; }
+  .mock-card-stack-b .p4 { top: 284px; min-height: 174px; }
+  .mock-card-stack-b .p5 { top: 408px; min-height: 96px; }
+  .mock-card-stack-c .p1 { top: 18px; transform: scale(0.89) translateY(-18px); opacity: 0.36; }
+  .mock-card-stack-c .p2 { top: 74px; transform: scale(0.95) translateY(-8px); opacity: 0.60; }
+  .mock-card-stack-c .p3 { top: 138px; min-height: 228px; }
+  .mock-card-stack-c .p4 { top: 320px; min-height: 126px; }
+  .mock-card-stack-c .p5 { top: 422px; min-height: 74px; opacity: 0.74; }
+  .legend {
+    display: grid;
+    gap: 6px;
+    margin-top: 14px;
+    color: #5f5544;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  @media (max-width: 1100px) {
+    .stack-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<h2>滚动堆栈方向选择</h2>
+<p class="subtitle">都保留你指定的顺序和暖色基调，只比较编排节奏与卡片进入方式。点击卡片可选。</p>
+
+<div class="stack-grid">
+  <div class="card option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="stack-card">
+      <div class="label">A / 推荐</div>
+      <h3>展馆式居中堆栈</h3>
+      <div class="stack-caption">当前卡片稳定停在中部，上一张退到后方，下一张从底部覆上来</div>
+      <div class="stack-stage mock-card-stack-a">
+        <div class="mock-panel p1"><div class="mock-line short"></div><div class="mock-line mid"></div></div>
+        <div class="mock-panel p2"><div class="mock-line short"></div><div class="mock-line long"></div></div>
+        <div class="mock-panel p3">
+          <div class="mock-line short"></div>
+          <div class="mock-line long"></div>
+          <div class="mock-line mid"></div>
+          <div class="mock-chips"><div class="mock-chip"></div><div class="mock-chip alt"></div></div>
+        </div>
+        <div class="mock-panel p4"><div class="mock-line short"></div><div class="mock-line long"></div><div class="mock-line mid"></div></div>
+        <div class="footer"></div>
+      </div>
+      <div class="legend">
+        <div>优点：堆栈感最强，最接近你说的“覆盖上来”。</div>
+        <div>代价：任务多时需要把卡片内部留出更明确的滚动节奏。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="stack-card">
+      <div class="label">B</div>
+      <h3>卷轴式均匀堆栈</h3>
+      <div class="stack-caption">每张卡片高度更接近，切换更平滑，但层叠压迫感更弱</div>
+      <div class="stack-stage mock-card-stack-b">
+        <div class="mock-panel p1"><div class="mock-line short"></div><div class="mock-line mid"></div></div>
+        <div class="mock-panel p2"><div class="mock-line short"></div><div class="mock-line long"></div></div>
+        <div class="mock-panel p3"><div class="mock-line short"></div><div class="mock-line long"></div><div class="mock-line mid"></div></div>
+        <div class="mock-panel p4"><div class="mock-line short"></div><div class="mock-line long"></div><div class="mock-line mid"></div></div>
+        <div class="mock-panel p5"><div class="mock-line short"></div><div class="mock-line mid"></div></div>
+      </div>
+      <div class="legend">
+        <div>优点：长内容最稳，移动端适配最保守。</div>
+        <div>代价：视觉记忆点弱一些，更像高级长页而不是卡片堆栈。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="stack-card">
+      <div class="label">C</div>
+      <h3>首卡强化混合堆栈</h3>
+      <div class="stack-caption">今日任务更大更强，后面几张逐步收束，像从概览走进执行</div>
+      <div class="stack-stage mock-card-stack-c">
+        <div class="mock-panel p1"><div class="mock-line short"></div><div class="mock-line mid"></div></div>
+        <div class="mock-panel p2"><div class="mock-line short"></div><div class="mock-line long"></div></div>
+        <div class="mock-panel p3">
+          <div class="mock-line short"></div>
+          <div class="mock-line long"></div>
+          <div class="mock-line long"></div>
+          <div class="mock-line mid"></div>
+          <div class="mock-chips"><div class="mock-chip"></div><div class="mock-chip alt"></div></div>
+        </div>
+        <div class="mock-panel p4"><div class="mock-line short"></div><div class="mock-line long"></div></div>
+        <div class="mock-panel p5"><div class="mock-line short"></div></div>
+      </div>
+      <div class="legend">
+        <div>优点：第一屏最有展示感，概览和输入区更像开场。</div>
+        <div>代价：各屏节奏不完全一致，实现时需要更多分段样式。</div>
+      </div>
+    </div>
+  </div>
+</div>
