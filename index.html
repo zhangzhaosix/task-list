@@ -252,38 +252,6 @@
     letter-spacing: -0.02em;
     color: var(--ink);
   }
-  header h1 .icon-wrap {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    background: linear-gradient(135deg, #f5b041, #ff9a76);
-    border-radius: 10px;
-    margin-right: 8px;
-    vertical-align: middle;
-    position: relative;
-    box-shadow: 0 3px 10px rgba(245, 176, 65, 0.3);
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
-  }
-  header h1 .icon-wrap:hover {
-    transform: scale(1.10) rotate(-5deg);
-    box-shadow: 0 6px 20px rgba(245, 176, 65, 0.45);
-  }
-  header h1 .icon-wrap svg {
-    width: 18px;
-    height: 18px;
-    fill: none;
-    stroke: #fff;
-    stroke-width: 2.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
-  }
-  @keyframes iconPulse {
-    0%, 100% { box-shadow: 0 3px 10px rgba(245, 176, 65, 0.3); }
-    50% { box-shadow: 0 3px 18px rgba(245, 176, 65, 0.5); }
-  }
   #dateDisplay {
     color: var(--muted-2);
     font-size: 14px;
@@ -1419,12 +1387,15 @@
     line-height: 1.8;
     outline: none;
     resize: none;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     background: rgba(255, 255, 255, 0.72);
     color: #475569;
     transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
     min-height: 280px;
+    max-height: 360px;
     letter-spacing: 0.2px;
+    scrollbar-gutter: stable;
   }
   .plan-section textarea:focus {
     border-color: rgba(245, 176, 65, 0.72);
@@ -1991,7 +1962,7 @@
       <div class="stack-panel">
         <div class="section-card">
           <header>
-            <h1><span class="icon-wrap"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> 今日任务</h1>
+            <h1>今日任务</h1>
             <span id="dateDisplay"></span>
           </header>
 
@@ -2306,10 +2277,10 @@
 
   let stackSections = [];
   let stackRaf = 0;
+  let stackWheelLockUntil = 0;
 
-  function updateStackState() {
-    stackRaf = 0;
-    if (!stackSections.length) return;
+  function getActiveStackIndex() {
+    if (!stackSections.length) return -1;
 
     const anchor = window.innerHeight * 0.48;
     let activeIndex = stackSections.findIndex(section => {
@@ -2317,19 +2288,81 @@
       return rect.top <= anchor && rect.bottom >= anchor;
     });
 
-    if (activeIndex === -1) {
-      let closestIndex = 0;
-      let minDistance = Infinity;
-      stackSections.forEach((section, index) => {
-        const rect = section.getBoundingClientRect();
-        const distance = Math.abs(rect.top - anchor);
-        if (distance < minDistance) {
-          minDistance = distance;
-          closestIndex = index;
-        }
-      });
-      activeIndex = closestIndex;
+    if (activeIndex !== -1) return activeIndex;
+
+    let closestIndex = 0;
+    let minDistance = Infinity;
+    stackSections.forEach((section, index) => {
+      const rect = section.getBoundingClientRect();
+      const distance = Math.abs(rect.top - anchor);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestIndex = index;
+      }
+    });
+
+    return closestIndex;
+  }
+
+  function canScrollVertically(el, deltaY) {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    if (!/(auto|scroll|overlay)/.test(style.overflowY)) return false;
+    if (el.scrollHeight <= el.clientHeight + 1) return false;
+
+    if (deltaY > 0) {
+      return el.scrollTop + el.clientHeight < el.scrollHeight - 1;
     }
+    return deltaY < 0 && el.scrollTop > 0;
+  }
+
+  function findScrollableAncestor(target, deltaY) {
+    for (let el = target; el && el !== document.body; el = el.parentElement) {
+      if (!(el instanceof HTMLElement)) continue;
+      if (canScrollVertically(el, deltaY)) return el;
+    }
+    return null;
+  }
+
+  function scrollToStackSection(index) {
+    const section = stackSections[index];
+    if (!section) return;
+
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    section.scrollIntoView({
+      behavior: reduceMotion ? 'auto' : 'smooth',
+      block: 'start',
+      inline: 'nearest'
+    });
+    requestStackState();
+  }
+
+  function handleStackWheel(event) {
+    if (!stackSections.length) return;
+    if (Date.now() < stackWheelLockUntil) return;
+    if (event.defaultPrevented || event.ctrlKey) return;
+    if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+    if (event.deltaY === 0) return;
+
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    if (target.closest('input, textarea, select, [contenteditable="true"], .login-overlay, .modal-overlay, .confirm-overlay, .celebration-overlay')) return;
+    if (findScrollableAncestor(target, event.deltaY)) return;
+
+    const activeIndex = getActiveStackIndex();
+    const nextIndex = activeIndex + (event.deltaY > 0 ? 1 : -1);
+    if (nextIndex < 0 || nextIndex >= stackSections.length) return;
+
+    event.preventDefault();
+    stackWheelLockUntil = Date.now() + 700;
+    scrollToStackSection(nextIndex);
+  }
+
+  function updateStackState() {
+    stackRaf = 0;
+    if (!stackSections.length) return;
+
+    const activeIndex = getActiveStackIndex();
 
     stackSections.forEach((section, index) => {
       const panel = section.querySelector('.stack-panel');
@@ -2360,6 +2393,7 @@
 
     window.addEventListener('scroll', requestStackState, { passive: true });
     window.addEventListener('resize', requestStackState, { passive: true });
+    window.addEventListener('wheel', handleStackWheel, { passive: false });
     requestStackState();
   }
 
