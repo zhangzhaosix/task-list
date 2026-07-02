@@ -2339,14 +2339,19 @@
 
   function handleStackWheel(event) {
     if (!stackSections.length) return;
-    if (Date.now() < stackWheelLockUntil) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    if (target.closest('input, textarea, select, [contenteditable="true"], .login-overlay, .modal-overlay, .confirm-overlay, .celebration-overlay')) return;
+
+    if (Date.now() < stackWheelLockUntil) {
+      if (!findScrollableAncestor(target, event.deltaY)) event.preventDefault();
+      return;
+    }
+
     if (event.defaultPrevented || event.ctrlKey) return;
     if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
     if (event.deltaY === 0) return;
 
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target) return;
-    if (target.closest('input, textarea, select, [contenteditable="true"], .login-overlay, .modal-overlay, .confirm-overlay, .celebration-overlay')) return;
     if (findScrollableAncestor(target, event.deltaY)) return;
 
     const activeIndex = getActiveStackIndex();
