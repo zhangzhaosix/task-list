@@ -2206,6 +2206,7 @@
   let tasks = [];
   let mindsets = [];
   let planText = null, planHint = null, planWordCount = null, planTimer = null;
+  let isPlanComposing = false;
   let pendingNoteForTask = null;
 
   // ===== UI Helpers =====
@@ -2445,7 +2446,7 @@
           } catch { mindsets = []; changed = true; }
           if (planText) {
             var newPlan = d.plan || '';
-            if (newPlan !== planText.value) {
+            if (newPlan !== planText.value && document.activeElement !== planText && !isPlanComposing) {
               planText.value = newPlan;
               changed = true;
             }
@@ -3162,20 +3163,41 @@
 
   function autoResize(el) {
     if (!el) return;
+    const scrollTop = el.scrollTop;
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
+    el.scrollTop = scrollTop;
   }
 
   function setupPlanListeners() {
     if (!planText) return;
-    planText.addEventListener('input', function() {
-      autoResize(this);
+
+    function handlePlanInput(shouldSave) {
+      autoResize(planText);
       updatePlanWordCount();
       updateOverview();
+      if (!shouldSave) return;
       planHint.textContent = '自动保存';
       planHint.className = 'plan-save-hint';
       clearTimeout(planTimer);
       planTimer = setTimeout(() => saveToFirestore(), 500);
+    }
+
+    planText.addEventListener('compositionstart', function() {
+      isPlanComposing = true;
+      clearTimeout(planTimer);
+    });
+    planText.addEventListener('compositionend', function() {
+      isPlanComposing = false;
+      handlePlanInput(true);
+    });
+    planText.addEventListener('input', function(e) {
+      handlePlanInput(!(e.isComposing || isPlanComposing));
+    });
+    planText.addEventListener('blur', function() {
+      if (isPlanComposing) return;
+      clearTimeout(planTimer);
+      saveToFirestore();
     });
     autoResize(planText);
     updatePlanWordCount();
