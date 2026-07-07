@@ -2423,49 +2423,61 @@
 
   function subscribeFirestore() {
     if (unsubFirestore) unsubFirestore();
-    unsubFirestore = getDocRef().onSnapshot(doc => {
+    unsubFirestore = getDocRef().onSnapshot(async doc => {
       fromSnapshot = true;
       var changed = false;
-      if (doc.exists) {
-        var d = doc.data();
-        try {
-          var newTasks = d.tasks ? JSON.parse(d.tasks) : [];
-          if (JSON.stringify(newTasks) !== JSON.stringify(tasks)) {
-            tasks = newTasks;
-            changed = true;
+      try {
+        if (doc.exists) {
+          var d = doc.data();
+          try {
+            var newTasks = d.tasks ? JSON.parse(d.tasks) : [];
+            if (JSON.stringify(newTasks) !== JSON.stringify(tasks)) {
+              tasks = newTasks;
+              changed = true;
+            }
+          } catch { tasks = []; changed = true; }
+          try {
+            var newMindsets = d.mindsets ? JSON.parse(d.mindsets) : [];
+            if (JSON.stringify(newMindsets) !== JSON.stringify(mindsets)) {
+              mindsets = newMindsets;
+              changed = true;
+            }
+          } catch { mindsets = []; changed = true; }
+          if (planText) {
+            var newPlan = d.plan || '';
+            if (newPlan !== planText.value) {
+              planText.value = newPlan;
+              changed = true;
+            }
           }
-        } catch { tasks = []; changed = true; }
-        try {
-          var newMindsets = d.mindsets ? JSON.parse(d.mindsets) : [];
-          if (JSON.stringify(newMindsets) !== JSON.stringify(mindsets)) {
-            mindsets = newMindsets;
+        } else {
+          var migrated = await migrateLocalData();
+          if (migrated) {
             changed = true;
-          }
-        } catch { mindsets = []; changed = true; }
-        if (planText) {
-          var newPlan = d.plan || '';
-          if (newPlan !== planText.value) {
-            planText.value = newPlan;
+          } else {
+            // 新用户（或首次登录）：没有旧本地数据时，以空白状态开始
+            tasks = [];
+            mindsets = [];
+            if (planText) planText.value = '';
             changed = true;
+            await getDocRef().set({
+              tasks: JSON.stringify(tasks),
+              plan: '',
+              mindsets: JSON.stringify(mindsets),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
           }
         }
-      } else {
-        // 新用户（或首次登录）：清空一切残留数据，以空白状态开始
-        tasks = [];
-        mindsets = [];
-        if (planText) planText.value = '';
-        changed = true;
-        saveToFirestore(); // 创建空白文档
-        localStorage.removeItem('daily_tasks');
-        localStorage.removeItem('daily_tasks_plan');
-        localStorage.removeItem('daily_tasks_mindset');
+        if (changed) {
+          render();
+          if (typeof renderMindsets === 'function') renderMindsets();
+          if (planText) { autoResize(planText); updatePlanWordCount(); }
+        }
+      } catch (e) {
+        console.error('Firestore data load error:', e);
+      } finally {
+        fromSnapshot = false;
       }
-      if (changed) {
-        render();
-        if (typeof renderMindsets === 'function') renderMindsets();
-        if (planText) { autoResize(planText); updatePlanWordCount(); }
-      }
-      fromSnapshot = false;
     }, err => {
       console.error('Firestore subscription error:', err);
       fromSnapshot = false;
@@ -2477,6 +2489,8 @@
     const localTasks = localStorage.getItem('daily_tasks');
     const localPlan = localStorage.getItem('daily_tasks_plan');
     const localMindsets = localStorage.getItem('daily_tasks_mindset');
+    if (!localTasks && !localPlan && !localMindsets) return false;
+
     if (localTasks || localPlan || localMindsets) {
       try { if (localTasks) tasks = JSON.parse(localTasks); } catch {}
       try { if (localMindsets) mindsets = JSON.parse(localMindsets); } catch {}
@@ -2491,10 +2505,13 @@
         localStorage.removeItem('daily_tasks');
         localStorage.removeItem('daily_tasks_plan');
         localStorage.removeItem('daily_tasks_mindset');
+        return true;
       } catch (e) {
         console.error('数据迁移写入失败:', e);
+        throw e;
       }
     }
+    return false;
   }
 
   // ===== Task Operations =====
