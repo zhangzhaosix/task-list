@@ -24,3 +24,8 @@ Thumbs.db
 credentials.json
 temp/
 tmp/
+.agents/
+.superpowers/
+AGENTS.md
+CLAUDE.md
+screenshot.png

@@ -30,7 +30,6 @@
 - `index.html`：页面入口，样式和脚本都在这个文件里
 - `README.md`：项目说明与使用文档
 - `PRODUCT.md`：产品与设计上下文
-- `.agents/skills/impeccable/`：前端审查与页面质量检查链路
 - `LICENSE`：开源协议
 
 ## 本地启动方式
@@ -63,12 +62,6 @@ Firebase 配置直接写在 `index.html` 的初始化代码中。如果需要切
 
 ### 修改后样式没有变化
 确认浏览器没有缓存旧文件，必要时强制刷新。
-
-## 前端审查链路
-
-项目内置 `.agents/skills/impeccable/`，用于前端审查与页面质量检查。
-
-执行相关审查脚本前，请保留根目录 `PRODUCT.md`。
 
 ## 开源协议
 
