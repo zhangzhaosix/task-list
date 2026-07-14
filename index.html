@@ -1203,6 +1203,10 @@
     color: var(--danger);
     background: rgba(239, 68, 68, 0.05);
   }
+  .data-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
 
   /* ===== Login Overlay ===== */
   .login-overlay {
@@ -2127,6 +2131,7 @@
   <div class="footer-bar">
     <div class="footer-actions">
       <button class="clear-btn" id="clearBtn">清空已完成</button>
+      <button class="data-btn" id="restoreBackupBtn" style="display:none">恢复最近备份</button>
       <button class="data-btn logout-btn" id="logoutBtn">退出登录</button>
     </div>
   </div>
@@ -2202,7 +2207,11 @@
   // ===== State =====
   let user = null;
   let unsubFirestore = null;
-  let fromSnapshot = false;
+  let firestoreReady = false;
+  let firestoreSaveQueue = Promise.resolve();
+  let syncSession = 0;
+  let listenersSetup = false;
+  let latestBackup = null;
   let tasks = [];
   let mindsets = [];
   let planText = null, planHint = null, planWordCount = null, planTimer = null;
@@ -2404,55 +2413,156 @@
   }
 
   // ===== Firestore =====
-  function getDocRef() {
-    return db.collection('users').doc(user.uid);
+  function getDocRef(uid) {
+    return db.collection('users').doc(uid || user.uid);
   }
 
-  async function saveToFirestore() {
-    if (!user || fromSnapshot) return;
+  function buildBackup(data) {
+    return {
+      tasks: typeof data.tasks === 'string' ? data.tasks : '[]',
+      plan: typeof data.plan === 'string' ? data.plan : '',
+      mindsets: typeof data.mindsets === 'string' ? data.mindsets : '[]',
+      backedUpAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+  }
+
+  function hasRecoverableData(data) {
     try {
-      await getDocRef().set({
-        tasks: JSON.stringify(tasks),
-        plan: planText ? planText.value : '',
-        mindsets: JSON.stringify(mindsets),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    } catch (e) {
-      console.error('Sync error:', e);
+      const dataTasks = JSON.parse(data.tasks || '[]');
+      const dataMindsets = JSON.parse(data.mindsets || '[]');
+      return Array.isArray(dataTasks) && Array.isArray(dataMindsets)
+        && (dataTasks.length > 0 || dataMindsets.length > 0 || Boolean(data.plan && data.plan.trim()));
+    } catch {
+      return false;
     }
+  }
+
+  function parseBackup(data) {
+    const backup = data && data.backup;
+    if (!backup || typeof backup.tasks !== 'string' || typeof backup.mindsets !== 'string') return null;
+    try {
+      const backupTasks = JSON.parse(backup.tasks);
+      const backupMindsets = JSON.parse(backup.mindsets);
+      if (!Array.isArray(backupTasks) || !Array.isArray(backupMindsets)) return null;
+      if (backupTasks.length === 0 && backupMindsets.length === 0 && !backup.plan) return null;
+      return {
+        tasks: backup.tasks,
+        plan: typeof backup.plan === 'string' ? backup.plan : '',
+        mindsets: backup.mindsets,
+        backedUpAt: backup.backedUpAt || null
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function updateBackupControl() {
+    const button = document.getElementById('restoreBackupBtn');
+    if (button) button.style.display = latestBackup ? 'inline-flex' : 'none';
+  }
+
+  function enqueueFirestoreWrite(uid, sessionId, payload, backupCurrent = true) {
+    firestoreSaveQueue = firestoreSaveQueue
+      .catch(() => {})
+      .then(async () => {
+        if (!user || user.uid !== uid || syncSession !== sessionId || !firestoreReady) return false;
+        await db.runTransaction(async transaction => {
+          const docRef = getDocRef(uid);
+          const currentDoc = await transaction.get(docRef);
+          if (!user || user.uid !== uid || syncSession !== sessionId || !firestoreReady) {
+            throw new Error('sync-session-changed');
+          }
+
+          const writeData = Object.assign({}, payload);
+          if (currentDoc.exists && backupCurrent) {
+            const currentData = currentDoc.data();
+            const nextData = Object.assign({}, currentData, writeData);
+            if (hasRecoverableData(nextData)) {
+              writeData.backup = buildBackup(nextData);
+            } else if (currentData.backup) {
+              writeData.backup = currentData.backup;
+            } else if (hasRecoverableData(currentData)) {
+              writeData.backup = buildBackup(currentData);
+            }
+          }
+          transaction.set(docRef, writeData, { merge: true });
+        });
+        return true;
+      })
+      .catch(e => {
+        if (e.message !== 'sync-session-changed') console.error('Sync error:', e);
+        return false;
+      });
+    return firestoreSaveQueue;
+  }
+
+  function saveToFirestore(fields) {
+    if (!user || !firestoreReady) return Promise.resolve(false);
+
+    const uid = user.uid;
+    const sessionId = syncSession;
+    const payload = {
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    const fieldSet = fields || ['tasks', 'plan', 'mindsets'];
+    if (fieldSet.includes('tasks')) payload.tasks = JSON.stringify(tasks);
+    if (fieldSet.includes('plan')) payload.plan = planText ? planText.value : '';
+    if (fieldSet.includes('mindsets')) payload.mindsets = JSON.stringify(mindsets);
+
+    // ponytail: backup the current server version in the same transaction as the next write.
+    return enqueueFirestoreWrite(uid, sessionId, payload);
   }
 
   function subscribeFirestore() {
     if (unsubFirestore) unsubFirestore();
-    unsubFirestore = getDocRef().onSnapshot(async doc => {
-      fromSnapshot = true;
+    firestoreReady = false;
+    const uid = user.uid;
+    const sessionId = syncSession;
+    return new Promise(resolve => {
+      let initialSnapshot = true;
+      let initialSnapshotReady = false;
+      const finishInitialSnapshot = ready => {
+        if (!initialSnapshot) return;
+        initialSnapshot = false;
+        if (user && user.uid === uid && syncSession === sessionId) firestoreReady = ready;
+        resolve(ready);
+      };
+
+      unsubFirestore = getDocRef(uid).onSnapshot(async doc => {
+        if (!user || user.uid !== uid || syncSession !== sessionId) return;
+
       var changed = false;
       try {
         if (doc.exists) {
           var d = doc.data();
-          try {
-            var newTasks = d.tasks ? JSON.parse(d.tasks) : [];
-            if (JSON.stringify(newTasks) !== JSON.stringify(tasks)) {
-              tasks = newTasks;
-              changed = true;
-            }
-          } catch { tasks = []; changed = true; }
-          try {
-            var newMindsets = d.mindsets ? JSON.parse(d.mindsets) : [];
-            if (JSON.stringify(newMindsets) !== JSON.stringify(mindsets)) {
-              mindsets = newMindsets;
-              changed = true;
-            }
-          } catch { mindsets = []; changed = true; }
+          latestBackup = parseBackup(d);
+          var newTasks = Object.prototype.hasOwnProperty.call(d, 'tasks')
+            ? JSON.parse(d.tasks || '[]')
+            : tasks;
+          var newMindsets = Object.prototype.hasOwnProperty.call(d, 'mindsets')
+            ? JSON.parse(d.mindsets || '[]')
+            : mindsets;
+          if (!Array.isArray(newTasks) || !Array.isArray(newMindsets)) {
+            throw new Error('Firestore 数据格式无效');
+          }
+          if (JSON.stringify(newTasks) !== JSON.stringify(tasks)) {
+            tasks = newTasks;
+            changed = true;
+          }
+          if (JSON.stringify(newMindsets) !== JSON.stringify(mindsets)) {
+            mindsets = newMindsets;
+            changed = true;
+          }
           if (planText) {
-            var newPlan = d.plan || '';
+            var newPlan = Object.prototype.hasOwnProperty.call(d, 'plan') ? (d.plan || '') : planText.value;
             if (newPlan !== planText.value && document.activeElement !== planText && !isPlanComposing) {
               planText.value = newPlan;
               changed = true;
             }
           }
         } else {
-          var migrated = await migrateLocalData();
+          latestBackup = null;
+          var migrated = await migrateLocalData(uid);
           if (migrated) {
             changed = true;
           } else {
@@ -2461,12 +2571,12 @@
             mindsets = [];
             if (planText) planText.value = '';
             changed = true;
-            await getDocRef().set({
+            await getDocRef(uid).set({
               tasks: JSON.stringify(tasks),
               plan: '',
               mindsets: JSON.stringify(mindsets),
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            }, { merge: true });
           }
         }
         if (changed) {
@@ -2474,19 +2584,22 @@
           if (typeof renderMindsets === 'function') renderMindsets();
           if (planText) { autoResize(planText); updatePlanWordCount(); }
         }
+        updateBackupControl();
+        initialSnapshotReady = true;
       } catch (e) {
         console.error('Firestore data load error:', e);
       } finally {
-        fromSnapshot = false;
+        finishInitialSnapshot(initialSnapshotReady);
       }
     }, err => {
       console.error('Firestore subscription error:', err);
-      fromSnapshot = false;
+      finishInitialSnapshot(false);
+    });
     });
   }
 
   // ===== Local Data Migration =====
-  async function migrateLocalData() {
+  async function migrateLocalData(uid) {
     const localTasks = localStorage.getItem('daily_tasks');
     const localPlan = localStorage.getItem('daily_tasks_plan');
     const localMindsets = localStorage.getItem('daily_tasks_mindset');
@@ -2497,12 +2610,12 @@
       try { if (localMindsets) mindsets = JSON.parse(localMindsets); } catch {}
       if (planText && localPlan) planText.value = localPlan;
       try {
-        await getDocRef().set({
+        await getDocRef(uid).set({
           tasks: JSON.stringify(tasks),
           plan: planText ? planText.value : '',
           mindsets: JSON.stringify(mindsets),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        }, { merge: true });
         localStorage.removeItem('daily_tasks');
         localStorage.removeItem('daily_tasks_plan');
         localStorage.removeItem('daily_tasks_mindset');
@@ -2518,7 +2631,53 @@
   // ===== Task Operations =====
   let currentType = 'daily';
 
-  function saveTasks() { saveToFirestore(); }
+  function saveTasks() { saveToFirestore(['tasks']); }
+
+  async function restoreLatestBackup() {
+    if (!latestBackup || !user || !firestoreReady) return;
+    const confirmed = await showConfirmDialog(
+      '将用最近安全备份覆盖当前任务、长期规划和思维模式。<br>确定要恢复吗？',
+      '恢复备份'
+    );
+    if (!confirmed) return;
+
+    const button = document.getElementById('restoreBackupBtn');
+    if (button) {
+      button.disabled = true;
+      button.textContent = '恢复中…';
+    }
+
+    try {
+      const restoredTasks = JSON.parse(latestBackup.tasks);
+      const restoredMindsets = JSON.parse(latestBackup.mindsets);
+      if (!Array.isArray(restoredTasks) || !Array.isArray(restoredMindsets)) throw new Error('备份数据格式无效');
+
+      const uid = user.uid;
+      const sessionId = syncSession;
+      const restored = await enqueueFirestoreWrite(uid, sessionId, {
+        tasks: latestBackup.tasks,
+        plan: latestBackup.plan,
+        mindsets: latestBackup.mindsets,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, false);
+      if (!restored || !user || user.uid !== uid || syncSession !== sessionId) return;
+
+      tasks = restoredTasks;
+      mindsets = restoredMindsets;
+      if (planText) planText.value = latestBackup.plan;
+      render();
+      if (typeof renderMindsets === 'function') renderMindsets();
+      if (planText) { autoResize(planText); updatePlanWordCount(); }
+      if (planHint) planHint.textContent = '已恢复最近备份';
+    } catch (e) {
+      console.error('Backup restore error:', e);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = '恢复最近备份';
+      }
+    }
+  }
 
   function render() {
     const dailyList = document.getElementById('dailyList');
@@ -3073,18 +3232,31 @@
   initStackSections();
 
   auth.onAuthStateChanged(u => {
+    const sessionId = ++syncSession;
     if (u) {
       user = u;
+      tasks = [];
+      mindsets = [];
+      latestBackup = null;
+      updateBackupControl();
+      firestoreReady = false;
       hideLogin();
       planText = document.getElementById('planText');
       planHint = document.getElementById('planHint');
       planWordCount = document.getElementById('planWordCount');
       document.getElementById('dateDisplay').textContent = formatDate();
-      subscribeFirestore();
-      setupPlanListeners();
-      setupTaskListeners();
+      if (planText) planText.value = '';
+      subscribeFirestore().then(ready => {
+        if (ready && user && user.uid === u.uid && syncSession === sessionId) {
+          setupPlanListeners();
+          setupTaskListeners();
+        }
+      });
     } else {
       user = null;
+      latestBackup = null;
+      updateBackupControl();
+      firestoreReady = false;
       if (unsubFirestore) { unsubFirestore(); unsubFirestore = null; }
       showLogin();
     }
@@ -3170,7 +3342,7 @@
   }
 
   function setupPlanListeners() {
-    if (!planText) return;
+    if (!planText || listenersSetup) return;
 
     function handlePlanInput(shouldSave) {
       autoResize(planText);
@@ -3180,7 +3352,7 @@
       planHint.textContent = '自动保存';
       planHint.className = 'plan-save-hint';
       clearTimeout(planTimer);
-      planTimer = setTimeout(() => saveToFirestore(), 500);
+      planTimer = setTimeout(() => saveToFirestore(['plan']), 500);
     }
 
     planText.addEventListener('compositionstart', function() {
@@ -3197,13 +3369,15 @@
     planText.addEventListener('blur', function() {
       if (isPlanComposing) return;
       clearTimeout(planTimer);
-      saveToFirestore();
+      saveToFirestore(['plan']);
     });
     autoResize(planText);
     updatePlanWordCount();
   }
 
   function setupTaskListeners() {
+    if (listenersSetup) return;
+    listenersSetup = true;
     // 添加按钮 → 打开三步模态框
     document.getElementById('addBtn').addEventListener('click', openAddModal);
     document.getElementById('taskInput').addEventListener('keydown', function(e) {
@@ -3262,6 +3436,7 @@
     });
 
     document.getElementById('clearBtn').addEventListener('click', clearCompleted);
+    document.getElementById('restoreBackupBtn').addEventListener('click', restoreLatestBackup);
 
     document.querySelectorAll('.type-btn').forEach(btn => {
       btn.addEventListener('click', function() {
@@ -3285,7 +3460,7 @@
   }
 
   // ===== Mindset =====
-  function saveMindsets() { saveToFirestore(); }
+  function saveMindsets() { saveToFirestore(['mindsets']); }
 
   function renderMindsets() {
     const list = document.getElementById('mindsetList');
