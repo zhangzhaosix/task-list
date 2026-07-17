@@ -28,14 +28,15 @@
 
 ## 目录结构
 
-- `index.html`：页面入口，样式和脚本都在这个文件里
+- `code/index.html`：页面入口，样式和脚本都在这个文件里
+- `code/tests/`：回归测试
+- `docs/PRODUCT.md`：产品与设计上下文
 - `README.md`：项目说明与使用文档
-- `PRODUCT.md`：产品与设计上下文
 - `LICENSE`：开源协议
 
 ## 本地启动方式
 
-1. 直接用浏览器打开 `index.html`
+1. 直接用浏览器打开 `code/index.html`
 2. 如果需要调试网络请求或跨域行为，可以用任意静态服务器临时打开
 
 这个项目不需要安装依赖，也不需要构建步骤。
@@ -44,13 +45,13 @@
 
 当前版本不依赖额外环境变量。
 
-Firebase 配置直接写在 `index.html` 的初始化代码中。如果需要切换 Firebase 项目，请修改页面里的 `firebase.initializeApp(...)` 配置。
+Firebase 配置直接写在 `code/index.html` 的初始化代码中。如果需要切换 Firebase 项目，请修改页面里的 `firebase.initializeApp(...)` 配置。
 
 ## 部署注意事项
 
-- 可直接部署到任意静态托管平台
-- 如果使用 GitHub Pages，保留仓库根目录的 `.nojekyll`
-- 部署前确认 `index.html` 中的 Firebase 配置已指向目标项目
+- 可将 `code/` 设置为静态托管平台的发布目录
+- 如果使用 GitHub Pages，需要把 `code/` 的内容发布到 Pages 站点根目录，并保留 `.nojekyll`
+- 部署前确认 `code/index.html` 中的 Firebase 配置已指向目标项目
 - 不要上传密钥、私钥、日志、缓存和构建产物
 
 ## 常见问题
